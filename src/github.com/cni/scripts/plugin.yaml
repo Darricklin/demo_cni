@@ -1,0 +1,293 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cni-config
+  namespace: kube-system
+data:
+  server_bind_host: ""
+  server_bind_port: ""
+#  server_username: ""
+#  server_password: ""
+#  server_protocol: ""
+#  server_certfile: ""
+#  server_keyfile: ""
+#  server_cafile: ""
+  etcd_servers: "http://6.0.0.11:2379"
+  etcd_certfile: ""
+  etcd_keyfile: ""
+  etcd_cafile: ""
+  k8s_api_server: "https://2.2.0.15:6443"
+  k8s_ca: "/etc/cni-plugin/ca.crt"
+  k8s_key: "/etc/cni-plugin/apiserver-kubelet-client.key"
+  k8s_cert: "/etc/cni-plugin/apiserver-kubelet-client.crt"
+  k8s_token: ""
+  log_dir: "/var/log/cni-plugin/"
+  log_level: "1"
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: demo-cni
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: demo-cni
+subjects:
+  - kind: ServiceAccount
+    name: demo-cni
+    namespace: kube-system
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: demo-cni
+  namespace: kube-system
+rules:
+  - apiGroups: ["sdnc.io"]
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+      - extensions
+    resources:
+      - services
+      - pods
+      - namespaces
+      - endpoints
+    verbs:
+      - get
+      - patch
+      - watch
+      - list
+      - update
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - watch
+      - list
+
+
+
+---
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-cni
+  namespace: kube-system
+
+---
+
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: kube-system
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 0
+  template:
+    metadata:
+      name: node-agent
+      namespace: kube-system
+      labels:
+        app: node-agent
+    spec:
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+        - key: CriticalAddonsOnly
+          operator: Exists
+      priorityClassName: system-node-critical
+      serviceAccountName: demo-cni
+      containers:
+        - name: node-agent
+          image: k8s.io/node-agent:v1.0
+          args:
+            - --etcd-servers
+            - $(ETCD_SERVERS)
+            - --etcd-certfile
+            - $(ETCD_CERTFILE)
+            - --etcd-keyfile
+            - $(ETCD_KEYFILE)
+            - --etcd-cafile
+            - $(ETCD_CAFILE)
+            - --k8s-api-server
+            - $(K8S_API_SERVER)
+            - --k8s-ca
+            - $(K8S_CA)
+            - --k8s-key
+            - $(K8S_KEY)
+            - --k8s-cert
+            - $(K8S_CERT)
+            - --k8s-token
+            - $(K8S_TOKEN)
+            - --log-dir
+            - $(LOG_DIR)
+            - --log-level
+            - $(LOG_LEVEL)
+            - --server-bind-host
+            - $(SERVER_BIND_HOST)
+            - --server-bind-port
+            - $(SERVER_BIND_PORT)
+#            - --server-username
+#            - $(SERVER_USERNAME)
+#            - --server-password
+#            - $(SERVER_PASSWORD)
+#            - --server-certfile
+#            - $(SERVER_CERTFILE)
+#            - --server-keyfile
+#            - $(SERVER_KEYFILE)
+#            - --server-cafile
+#            - $(SERVER_CAFILE)
+#            - --server-protocol
+#            - $(SERVER_PROTOCOL)
+          env:
+            - name: ETCD_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_servers
+            - name: ETCD_CERTFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_certfile
+            - name: ETCD_KEYFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_keyfile
+            - name: ETCD_CAFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_cafile
+            - name: K8S_API_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_api_server
+            - name: K8S_CA
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_ca
+            - name: K8S_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_key
+            - name: K8S_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_cert
+            - name: K8S_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_token
+            - name: LOG_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_dir
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_level
+            - name: SERVER_BIND_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: server_bind_host
+            - name: SERVER_BIND_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: server_bind_port
+#            - name: SERVER_USERNAME
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_username
+#            - name: SERVER_PASSWORD
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_password
+#            - name: SERVER_PROTOCOL
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_protocol
+#            - name: SERVER_CERTFILE
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_certfile
+#            - name: SERVER_KEYFILE
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_keyfile
+#            - name: SERVER_CAFILE
+#              valueFrom:
+#                configMapKeyRef:
+#                  name: sdnc-net-config
+#                  key: server_cafile
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/log/cni-plugin/
+              name: cni-config-log-dir
+              readOnly: false
+            - mountPath: /etc/cni-plugin/
+              name: cni-config-etc-dir
+              readOnly: false
+            - mountPath: /etc/localtime
+              name: localtime
+              readOnly: false
+          livenessProbe:
+            httpGet:
+              path: /index
+              port: 9443
+            initialDelaySeconds: 60
+            periodSeconds: 60
+      restartPolicy: Always
+      volumes:
+        - name: cni-config-log-dir
+          hostPath:
+            path: /var/log/cni-plugin/
+        - name: cni-config-etc-dir
+          hostPath:
+            path: /etc/cni-plugin/
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
