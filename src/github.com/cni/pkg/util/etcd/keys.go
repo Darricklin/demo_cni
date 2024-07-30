@@ -25,3 +25,10 @@ func PodsKey() string {
 func PodKey(nameSpace, podName string) string {
 	return fmt.Sprintf("%s%s/%s", PodsKey, nameSpace, podName)
 }
+
+func LocksKey() string {
+	return fmt.Sprintf("%s%s/", CniPrefix, Locks)
+}
+func NetWorkCrdLocksKey(name string) string {
+	return fmt.Sprintf("%s%s/", LocksKey(), name)
+}

@@ -1,5 +1,10 @@
 package k8s
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
 type Version struct {
 	Major    string `json:"major"`
 	Minor    string `json:"minor"`
@@ -144,20 +149,55 @@ type EndpointPort struct {
 }
 
 type NetworkCrdList struct {
-	ApiVersion string       `json:"apiVersion"`
-	Items      []NetworkCrd `json:"items"`
-	Kind       string       `json:"kind"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []NetworkCrd `json:"items"`
 }
 
 type NetworkCrd struct {
-	//ApiVersion string `json:"apiVersion"`
-	//Kind string `json:"kind"`
-	MetaData NetworkCrdMetaData `json:"metadata"`
-	Spec     NetworkCrdSpec     `json:"spec"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              NetworkCrdSpec `json:"spec"`
 }
 
-type NetworkCrdMetaData struct {
-	Name string `json:"name"`
+func (n *NetworkCrd) DeepCopyInto(out *NetworkCrd) {
+	*out = *n
+	out.TypeMeta = n.TypeMeta
+	n.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = n.Spec
+	return
+}
+
+func (n *NetworkCrd) DeepCopyObject() runtime.Object {
+	//TODO implement me
+	if n == nil {
+		return nil
+	}
+	out := new(NetworkCrd)
+	n.DeepCopyInto(out)
+	return out
+}
+
+func (n *NetworkCrdList) DeepCopyInto(out *NetworkCrdList) {
+	*out = *n
+	out.TypeMeta = n.TypeMeta
+	n.ListMeta.DeepCopyInto(&out.ListMeta)
+	if n.Items != nil {
+		in, out := &n.Items, &out.Items
+		*out = make([]NetworkCrd, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	return
+}
+func (n *NetworkCrdList) DeepCopyObject() runtime.Object {
+	if n == nil {
+		return nil
+	}
+	out := new(NetworkCrdList)
+	n.DeepCopyInto(out)
+	return out
 }
 
 type NetworkCrdSpec struct {
@@ -173,7 +213,7 @@ type Subnet struct {
 	Cidr       string `json:"cidr"`
 	EnableDHCP string `json:"enable_dhcp"`
 	GatewayIP  string `json:"gateway_ip"`
-	IPVersion  uint16 `json:"ip_version"`
+	IPVersion  string `json:"ip_version"`
 	Name       string `json:"name"`
 	SubnetID   string `json:"subnet_id"`
 }

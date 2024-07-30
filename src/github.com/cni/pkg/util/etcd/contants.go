@@ -5,4 +5,5 @@ const (
 	NodesKeyName    = "nodes"
 	NetworksKeyName = "networks"
 	PodsKeyName     = "pods"
+	Locks           = "locks"
 )

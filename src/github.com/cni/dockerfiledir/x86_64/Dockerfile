@@ -7,7 +7,7 @@ COPY . $GOPATH/src/github.com/cni/
 WORKDIR $GOPATH/src/github.com/cni/
 
 RUN GORACH=amd64 GOOS=linux GOGC=1500 CGO_ENABLE=0 go install -v -a -installsuffix cgo -ldflags "-s -w " -pkgdir /tmp/cni-cgo \
-    ./cmd/cni-plugin/ ./cmd/node-agent/
+    ./app/cni-plugin/ ./app/node-agent/
 
 FROM centos:7.5.1804
 

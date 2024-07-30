@@ -15,10 +15,11 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.15
 	k8s.io/api v0.30.3
 	k8s.io/apimachinery v0.30.3
-	k8s.io/client-go v0.30.3
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.120.1
 )
+
+require k8s.io/client-go v0.30.3
 
 require (
 	github.com/coreos/go-iptables v0.7.0 // indirect
@@ -32,6 +33,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect

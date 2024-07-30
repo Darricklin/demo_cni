@@ -3,6 +3,7 @@ package ipam
 import (
 	"errors"
 	"fmt"
+	"github.com/cni/cmd/node-agent/app/options"
 	"github.com/cni/pkg/util/etcd"
 	"github.com/cni/pkg/util/k8s"
 	"github.com/containernetworking/plugins/pkg/ip"
@@ -97,10 +98,25 @@ const prefix = "cni/ipam"
 //}
 
 type IpamDriver struct {
-	K8sClient  *k8s.Client
-	EtcdClient *etcd.Client
+	K8sClient   *k8s.Client
+	EtcdClient  *etcd.Client
+	NetWorkName string
+	Mu          *etcd.EtcdMutex
 	//nodeIpCache map[string]string
 	//cidrCache   map[string]string
+}
+
+func NewIpamDriver(na *options.NodeAgent, crd k8s.NetworkCrd) (*IpamDriver, error) {
+	ipam := &IpamDriver{
+		K8sClient:   na.K8sAgent,
+		EtcdClient:  na.EtcdAgent,
+		NetWorkName: crd.Name,
+	}
+
+	key := etcd.NetWorkCrdLocksKey(crd.Name)
+	mu := etcd.NewMutex(key, ipam.EtcdClient.Client)
+	ipam.Mu = mu
+	return ipam, nil
 }
 
 func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, error) {
@@ -108,7 +124,7 @@ func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, err
 	netAddr := subnet.IP.Mask(subnet.Mask)
 
 	// Iterate over the IP addresses within the subnet.
-	for ip := netAddr.Mask(subnet.Mask); subnet.Contains(ip); inc(ip) {
+	for ip := netAddr.Mask(subnet.Mask); subnet.Contains(ip); Inc(ip) {
 		// Skip the network and broadcast addresses.
 		_, ok := AllocateIPMap[ip.String()]
 		if ip.Equal(subnet.IP) || ip.Equal(ones(subnet.IP)) || ok {
@@ -124,7 +140,7 @@ func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, err
 }
 
 // Increment IP address
-func inc(ip net.IP) {
+func Inc(ip net.IP) {
 	for j := len(ip) - 1; j >= 0; j-- {
 		ip[j]++
 		if ip[j] > 0 {
@@ -142,10 +158,10 @@ func ones(ip net.IP) net.IP {
 	}
 	return result
 }
-func CreateNetworkCrd() {}
 
 func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, opts []clientv3.Op, err error) {
-	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
+	networkKey := etcd.NetworkKey(network)
+	networkCrd, err := ipam.EtcdClient.GetNetwork(networkKey)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
 		errMsg := fmt.Sprintf("failed to get network %v from etcd ", network)
@@ -181,6 +197,8 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 	}
 	op, err := etcd.OpPutObject(network, networkCrd)
 	if err != nil {
+		return nil, nil, nil, err
+	} else {
 		opts = append(opts, op)
 	}
 	return ipaddr, gw, opts, nil
