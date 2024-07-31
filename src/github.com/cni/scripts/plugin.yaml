@@ -519,6 +519,9 @@ spec:
             - mountPath: /etc/localtime
               name: localtime
               readOnly: false
+            - mountPath: /etc/webhook/certs
+              name: webhook-certs
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /version
@@ -536,6 +539,9 @@ spec:
         - name: localtime
           hostPath:
             path: /etc/localtime
+        - name: webhook-certs
+          secret:
+            secretName: master-webhook-certs
 
 ---
 

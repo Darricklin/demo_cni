@@ -4,7 +4,7 @@ set -x
 set -e
 
 usage() {
-    cat <<EOF
+  cat <<EOF
 Generate certificate suitable for use with an validate webhook service.
 
 This script uses k8s' CertificateSigningRequest API to a generate a
@@ -23,42 +23,42 @@ The following flags are required.
        --namespace        Namespace where webhook service and secret reside.
        --secret           Secret name for CA certificate and server certificate/key pair.
 EOF
-    exit 1
+  exit 1
 }
 
 while [[ $# -gt 0 ]]; do
-    case ${1} in
-        --service)
-            service="$2"
-            shift
-            ;;
-        --secret)
-            secret="$2"
-            shift
-            ;;
-        --namespace)
-            namespace="$2"
-            shift
-            ;;
-        *)
-            usage
-            ;;
-    esac
+  case ${1} in
+  --service)
+    service="$2"
     shift
+    ;;
+  --secret)
+    secret="$2"
+    shift
+    ;;
+  --namespace)
+    namespace="$2"
+    shift
+    ;;
+  *)
+    usage
+    ;;
+  esac
+  shift
 done
 
-[ -z ${service} ] && service=sdnc-net-master-webhook
-[ -z ${secret} ] && secret=sdnc-net-webhook-certs
+[ -z ${service} ] && service=master-webhook-service
+[ -z ${secret} ] && secret=master-webhook-certs
 [ -z ${namespace} ] && namespace=kube-system
 
 if [ ! -x "$(command -v cfssl)" ]; then
-    echo "cfssl not found"
-    exit 1
+  echo "cfssl not found"
+  exit 1
 fi
 
 if [ ! -x "$(command -v cfssljson)" ]; then
-    echo "cfssljson not found"
-    exit 1
+  echo "cfssljson not found"
+  exit 1
 fi
 
 csrName=${service}.${namespace}
@@ -103,18 +103,17 @@ EOF
 
 # verify CSR has been created
 while true; do
-    kubectl get csr ${csrName}
-    if [ "$?" -eq 0 ]; then
-        break
-    fi
+  kubectl get csr ${csrName}
+  if [ "$?" -eq 0 ]; then
+    break
+  fi
 done
-
 
 #approve and fetch the signed certificate
 kubectl certificate approve ${csrName}
 
 #Issue certificate
-cat > server-signing-config.json  <<EOF
+cat >server-signing-config.json <<EOF
 {
     "signing": {
         "default": {
@@ -135,41 +134,40 @@ EOF
 cakey=/etc/kubernetes/pki/ca.key
 cacrt=/etc/kubernetes/pki/ca.crt
 if [ ! -e $cakey ]; then
-    echo "${cakey} not found"
-    exit 1
+  echo "${cakey} not found"
+  exit 1
 else
-    cp /etc/kubernetes/pki/ca.key ca-key.pem
+  cp /etc/kubernetes/pki/ca.key ca-key.pem
 fi
 
 if [ ! -e $cacrt ]; then
-    echo "${cacrt} not found"
-    exit 1
+  echo "${cacrt} not found"
+  exit 1
 else
-    cp /etc/kubernetes/pki/ca.crt ca.pem
+  cp /etc/kubernetes/pki/ca.crt ca.pem
 fi
 
-kubectl get csr ${csrName}  -o jsonpath='{.spec.request}' | base64 --decode |   cfssl sign -ca ca.pem -ca-key ca-key.pem -config server-signing-config.json - |   cfssljson -bare ca-signed-server
+kubectl get csr ${csrName} -o jsonpath='{.spec.request}' | base64 --decode | cfssl sign -ca ca.pem -ca-key ca-key.pem -config server-signing-config.json - | cfssljson -bare ca-signed-server
 
 #Upload signature certificate
-kubectl get csr ${csrName}  -o json | jq '.status.certificate = "'$(base64 ca-signed-server.pem | tr -d '\n')'"' | kubectl replace --raw /apis/certificates.k8s.io/v1/certificatesigningrequests/${csrName}/status -f -
+kubectl get csr ${csrName} -o json | jq '.status.certificate = "'$(base64 ca-signed-server.pem | tr -d '\n')'"' | kubectl replace --raw /apis/certificates.k8s.io/v1/certificatesigningrequests/${csrName}/status -f -
 
 # verify certificate has been signed
 for x in $(seq 10); do
-    serverCert=$(kubectl get csr ${csrName} -o jsonpath='{.status.certificate}')
-    if [[ ${serverCert} != '' ]]; then
-        break
-    fi
-    sleep 1
+  serverCert=$(kubectl get csr ${csrName} -o jsonpath='{.status.certificate}')
+  if [[ ${serverCert} != '' ]]; then
+    break
+  fi
+  sleep 1
 done
 if [[ ${serverCert} == '' ]]; then
-    echo "ERROR: After approving csr ${csrName}, the signed certificate did not appear on the resource. Giving up after 10 attempts." >&2
-    exit 1
+  echo "ERROR: After approving csr ${csrName}, the signed certificate did not appear on the resource. Giving up after 10 attempts." >&2
+  exit 1
 fi
 
 #Load the certificate and use it
-kubectl get csr ${csrName}   -o jsonpath='{.status.certificate}' | base64 --decode > server-crt.pem
+kubectl get csr ${csrName} -o jsonpath='{.status.certificate}' | base64 --decode >server-crt.pem
 
 #Generate secret
 kubectl delete secret ${secret} -nkube-system 2>/dev/null || true
-kubectl create secret generic ${secret} --from-file=key.pem=server-key.pem --from-file=cert.pem=server-crt.pem -n kube-system  -o yaml
-
+kubectl create secret generic ${secret} --from-file=key.pem=server-key.pem --from-file=cert.pem=server-crt.pem -n kube-system -o yaml
