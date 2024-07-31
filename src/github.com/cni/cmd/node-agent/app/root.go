@@ -5,10 +5,12 @@ package app
 
 import (
 	"fmt"
+	"github.com/cni/cmd/node-agent/app/constants"
 	"github.com/cni/cmd/node-agent/app/options"
 	"github.com/cni/pkg/util/flags"
-	"github.com/cni/pkg/util/ipam"
+	"github.com/cni/pkg/util/server"
 	"k8s.io/klog/v2"
+	"net"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,16 +28,33 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
+
+}
+
+func NewNodeAgentCmd(srv *server.Server) *cobra.Command {
+	nodeFlags := options.NewNodeAgentFlags()
+	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		flags.PrintFlags(cmd.Flags())
+		hostname, err := os.Hostname()
+		if err != nil {
+			return fmt.Errorf("failed to get hostname :%s ", err)
+		}
+		hostIp := os.Getenv(constants.AgentNodeIP)
+		if net.ParseIP(hostIp) == nil {
+			return fmt.Errorf("node ip error format")
+		}
 		nodeAgent := &options.NodeAgent{
-			Server: nil,
-			Ipam:   ipam.IpamDriver{},
+			Server:   srv,
+			HostName: hostname,
+			HostIP:   hostIp,
 		}
 		if err := RUN(nodeAgent); err != nil {
 			klog.Fatal(err)
 		}
-	},
+		return nil
+	}
+	nodeFlags.AddFlags(rootCmd.Flags())
+	return rootCmd
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -57,5 +76,6 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
+	NewNodeAgentCmd(server.NewServerWithSignalHandler())
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/cni/cmd/node-agent/app/constants"
 	"github.com/cni/cmd/node-agent/app/options"
 	"github.com/cni/pkg/util/etcd"
+	"github.com/cni/pkg/util/ipam"
 	"github.com/cni/pkg/util/k8s"
 	"github.com/cni/pkg/util/rest"
 	"github.com/containernetworking/cni/pkg/types"
@@ -255,7 +256,11 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	result := &types100.Result{
 		CNIVersion: pod.Result.CNIVersion,
 	}
-	podIp, gwIp, ipOps, err := na.Ipam.AllocationIpFromNetwork(network)
+	ipamDriver, err := ipam.NewIpamDriver(na, network)
+	if err != nil {
+		return 0, podResp, fmt.Errorf("failed to get ipamDriver of network %s", network)
+	}
+	podIp, gwIp, ipOps, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Error(err)
 	}
@@ -315,7 +320,11 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (i
 	if err != nil {
 		return 0, err
 	}
-	networkOps, err := na.Ipam.ReleaseIpFromNetwork(network, podIp)
+	ipamDriver, err := ipam.NewIpamDriver(na, network)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get ipamDriver of network %s", network)
+	}
+	networkOps, err := ipamDriver.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
 		return 0, err
 	}

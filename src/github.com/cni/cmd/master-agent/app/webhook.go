@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -38,7 +39,7 @@ func InitWebHook(nm *options.MasterAgent) error {
 	}).Returns(http.StatusOK, http.StatusText(http.StatusOK), v1beta1.AdmissionReview{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), ErrorResp{}))
 	wsContainer.Add(ws)
-	tlsCertKey, err := tls.LoadX509KeyPair(nm.CertPath, nm.KeyPath)
+	tlsCertKey, err := tls.LoadX509KeyPair(nm.TlsCertPath, nm.TlsKeyPath)
 	if err != nil {
 		return err
 	}
@@ -60,7 +61,7 @@ func startTLSServer(nm *options.MasterAgent, server *http.Server, listener net.L
 	defer nm.StopWg.Done()
 	stopCh := make(chan struct{})
 	go func() {
-		if err := server.ServeTLS(listener, nm.CertPath, nm.KeyPath); err != nil {
+		if err := server.ServeTLS(listener, nm.TlsCertPath, nm.TlsKeyPath); err != nil {
 			klog.Error(err)
 			close(stopCh)
 		}
@@ -167,9 +168,23 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 		if err != nil {
 			return err
 		}
-		// TODO 如果有pod使用crd，不允许更新
+
 		if network.Name != networkold.Name {
 			return fmt.Errorf("name cannot change")
+		}
+		allPodList, err := nm.K8sAgent.GetPodList()
+		if err != nil {
+			return err
+		}
+		for _, pod := range allPodList.Items {
+			if networkAnno, ok := pod.MetaData.Annotations[constants.NETWORK]; ok {
+				networkInfo := strings.Split(networkAnno, "/")
+				if len(networkInfo) == 2 {
+					if network.Name == networkInfo[1] {
+						return fmt.Errorf("network used by pod,cannot update")
+					}
+				}
+			}
 		}
 		if !reflect.DeepEqual(network.Spec.SubNets, networkold.Spec.SubNets) {
 			var ops []clientv3.Op
@@ -210,11 +225,24 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 			return nil
 		}
 	case v1beta1.Delete:
-		// TODO 如果有pod使用crd，不允许删除
 		if len(request.Object.Raw) > 0 {
 			if err := json.Unmarshal(request.Object.Raw, &network); err != nil {
 				klog.Errorf("cannot unmarshal raw object ")
 				return err
+			}
+		}
+		allPodList, err := nm.K8sAgent.GetPodList()
+		if err != nil {
+			return err
+		}
+		for _, pod := range allPodList.Items {
+			if networkAnno, ok := pod.MetaData.Annotations[constants.NETWORK]; ok {
+				networkInfo := strings.Split(networkAnno, "/")
+				if len(networkInfo) == 2 {
+					if network.Name == networkInfo[1] {
+						return fmt.Errorf("network used by pod,cannot delete")
+					}
+				}
 			}
 		}
 		var ops []clientv3.Op

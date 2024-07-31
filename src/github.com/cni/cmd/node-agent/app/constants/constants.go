@@ -17,3 +17,5 @@ const (
 	HostVethMac = "ee:ee:ee:ee:ee:ee"
 	HostVethPre = "tap"
 )
+
+const AgentNodeIP = "HOST_IP"

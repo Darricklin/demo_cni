@@ -4,9 +4,12 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package app
 
 import (
-	"os"
-
+	"github.com/cni/cmd/master-agent/app/options"
+	"github.com/cni/pkg/util/flags"
+	"github.com/cni/pkg/util/server"
 	"github.com/spf13/cobra"
+	"k8s.io/klog"
+	"os"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -19,12 +22,26 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-
-	},
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(app *cobra.Command, args []string) { },
+}
+
+func NewMasterCommand(srv *server.Server) *cobra.Command {
+	masterFlags := options.NewMasterFlags()
+	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		flags.PrintFlags(cmd.Flags())
+		Master := &options.MasterAgent{
+			Server:           srv,
+			MasterAgentFlags: *masterFlags,
+		}
+		if err := RUN(Master); err != nil {
+			klog.Fatal(err)
+		}
+		return nil
+	}
+	masterFlags.AddFlags(rootCmd.Flags())
+	return rootCmd
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,5 +62,6 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
+	NewMasterCommand(server.NewServerWithSignalHandler())
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

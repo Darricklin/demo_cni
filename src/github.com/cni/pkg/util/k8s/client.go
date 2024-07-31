@@ -129,14 +129,13 @@ func (c *Client) GetPodAnnoAndLabels(ns, name string) (PodLabels, PodAnnotations
 	return pod.MetaData.Labels, pod.MetaData.Annotations, pod.Status.PodIP, nil
 }
 
-func (c *Client) GetPodList(req *restful.Request, resp *restful.Response) {
+func (c *Client) GetPodList() (PodList, error) {
 	var podList PodList
 
 	code, err := c.Request("GET", "/api/v1/pods", nil, &podList)
 	if err != nil {
 		klog.Errorf("failed to get k8s pods ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
+		return podList, err
 	}
 	podListResp := PodList{
 		Kind:       podList.Kind,
@@ -149,8 +148,7 @@ func (c *Client) GetPodList(req *restful.Request, resp *restful.Response) {
 		}
 	}
 	klog.Infof("get k8s pods : %+v , code : %v", podList, code)
-	_ = resp.WriteAsJson(podListResp)
-	return
+	return podList, nil
 }
 
 func (c *Client) UpdatePod(req *restful.Request, resp *restful.Response) {

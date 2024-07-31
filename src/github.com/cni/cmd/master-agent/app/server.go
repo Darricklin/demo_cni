@@ -26,48 +26,49 @@ import (
 	"time"
 )
 
-func RUN(na *options.MasterAgent) error {
-	err := run(na)
+func RUN(nm *options.MasterAgent) error {
+	err := run(nm)
 	if err != nil {
-		na.Cancel()
+		nm.Cancel()
 	}
 	select {
-	case <-na.Done():
-		na.StopWg.Wait()
+	case <-nm.Done():
+		nm.StopWg.Wait()
 		break
 	}
 	return err
 }
 
-func run(na *options.MasterAgent) error {
-	if err := initEtcd(na); err != nil {
+func run(nm *options.MasterAgent) error {
+	if err := initEtcd(nm); err != nil {
 		return err
 	}
-	if err := initK8s(na); err != nil {
+	if err := initK8s(nm); err != nil {
 		return err
 	}
-	if err := initServer(na); err != nil {
+	if err := initServer(nm); err != nil {
 		return err
 	}
 	return nil
 }
-func initEtcd(na *options.MasterAgent) error {
+func initEtcd(nm *options.MasterAgent) error {
 	klog.Infof("init etcd agent")
-	cli, err := etcd.NewClient(na.EtcdFlags.Flags)
+	cli, err := etcd.NewClient(nm.EtcdFlags.Flags)
 	if err != nil {
 		return fmt.Errorf("failed to create etcd client: %s", err)
 	}
-	na.EtcdAgent = cli
+
+	nm.EtcdAgent = cli
 	klog.Infof("init etcd agent succeed")
 	return nil
 }
-func initK8s(na *options.MasterAgent) error {
+func initK8s(nm *options.MasterAgent) error {
 	klog.Infof("init k8s agent")
-	k8sAgent, err := k8s.NewClient(na.K8sFlags.Flags)
+	k8sAgent, err := k8s.NewClient(nm.K8sFlags.Flags)
 	if err != nil {
 		return fmt.Errorf("failed to create k8s client: %s", err)
 	}
-	na.K8sAgent = k8sAgent
+	nm.K8sAgent = k8sAgent
 	klog.Infof("init k8s agent succeed")
 	klog.Infof("init k8s clientSet")
 	k8sconfig, err := clientcmd.BuildConfigFromFlags("", "")
@@ -78,7 +79,7 @@ func initK8s(na *options.MasterAgent) error {
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet : %s", err)
 	}
-	na.K8sClientSet = k8sClientSet
+	nm.K8sClientSet = k8sClientSet
 	klog.Infof("init k8sClientSet succeed")
 	return nil
 }
@@ -151,8 +152,8 @@ type VersionResp struct {
 	Version string `json:"version"`
 }
 
-func startServer(na *options.MasterAgent, server *http.Server, listener net.Listener) {
-	defer na.StopWg.Done()
+func startServer(nm *options.MasterAgent, server *http.Server, listener net.Listener) {
+	defer nm.StopWg.Done()
 	stopCh := make(chan struct{})
 	go func() {
 		if err := server.Serve(listener); err != nil {
@@ -161,7 +162,7 @@ func startServer(na *options.MasterAgent, server *http.Server, listener net.List
 		}
 	}()
 	select {
-	case <-na.Done():
+	case <-nm.Done():
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := server.Shutdown(ctx); err != nil {
 			klog.Error(err)
@@ -170,11 +171,11 @@ func startServer(na *options.MasterAgent, server *http.Server, listener net.List
 		<-stopCh
 		break
 	case <-stopCh:
-		na.Cancel()
+		nm.Cancel()
 		break
 	}
 }
-func GetHealth(na *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func GetHealth(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		health := HealthResp{Health: "ok"}
 		if err := response.WriteEntity(health); err != nil {
@@ -182,7 +183,7 @@ func GetHealth(na *options.MasterAgent) func(request *restful.Request, response 
 		}
 	}
 }
-func GetVersion(na *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func GetVersion(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		version := VersionResp{
 			Version: "v1.0",
@@ -193,13 +194,13 @@ func GetVersion(na *options.MasterAgent) func(request *restful.Request, response
 	}
 }
 
-func CreatePod(na *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func CreatePod(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
-		ProcessCreatePod(na, request, response, createPodWithLock)
+		ProcessCreatePod(nm, request, response, createPodWithLock)
 	}
 }
 
-func ProcessCreatePod(na *options.MasterAgent, request *restful.Request, response *restful.Response,
+func ProcessCreatePod(nm *options.MasterAgent, request *restful.Request, response *restful.Response,
 	createPodFunc func(*options.MasterAgent, Pod) (int, PodResponse, error)) {
 	var pod Pod
 	if err := request.ReadEntity(&pod); err != nil {
@@ -207,7 +208,7 @@ func ProcessCreatePod(na *options.MasterAgent, request *restful.Request, respons
 		return
 	}
 	klog.Infof("create pod request received: body is %+v", pod)
-	code, resp, err := createPodFunc(na, pod)
+	code, resp, err := createPodFunc(nm, pod)
 	if err != nil {
 		klog.Error(err, code)
 		return
@@ -217,8 +218,8 @@ func ProcessCreatePod(na *options.MasterAgent, request *restful.Request, respons
 	}
 }
 
-func GetNetconf(na *options.MasterAgent, ns, name string) (string, string, error) {
-	lables, annos, podIP, err := na.K8sAgent.GetPodAnnoAndLabels(ns, name)
+func GetNetconf(nm *options.MasterAgent, ns, name string) (string, string, error) {
+	lables, annos, podIP, err := nm.K8sAgent.GetPodAnnoAndLabels(ns, name)
 	if err != nil {
 		return "", "", err
 	}
@@ -247,19 +248,19 @@ func GeneratePortRandomMacAddress() string {
 	return macAddr
 }
 
-func createPodWithLock(na *options.MasterAgent, pod Pod) (int, PodResponse, error) {
-	na.Locker.Lock()
-	defer na.Locker.Unlock()
+func createPodWithLock(nm *options.MasterAgent, pod Pod) (int, PodResponse, error) {
+	nm.Locker.Lock()
+	defer nm.Locker.Unlock()
 	var podResp PodResponse
 	var opts []clientv3.Op
-	network, _, err := GetNetconf(na, pod.Namespace, pod.Name)
+	network, _, err := GetNetconf(nm, pod.Namespace, pod.Name)
 	if err != nil {
 		return 400, podResp, err
 	}
 	result := &types100.Result{
 		CNIVersion: pod.Result.CNIVersion,
 	}
-	podIp, gwIp, ipOps, err := na.Ipam.AllocationIpFromNetwork(network)
+	podIp, gwIp, ipOps, err := nm.Ipam.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Error(err)
 	}
@@ -293,33 +294,33 @@ func createPodWithLock(na *options.MasterAgent, pod Pod) (int, PodResponse, erro
 	return 400, podResp, nil
 }
 
-func DeletePod(na *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func DeletePod(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
-		ProcessDeletePod(na, request, response, deletePodWithLock)
+		ProcessDeletePod(nm, request, response, deletePodWithLock)
 	}
 }
 
-func ProcessDeletePod(na *options.MasterAgent, request *restful.Request, response *restful.Response,
+func ProcessDeletePod(nm *options.MasterAgent, request *restful.Request, response *restful.Response,
 	deletePodFunc func(*options.MasterAgent, string, string, string) (int, error)) {
 	namespace := request.PathParameter(constants.PodNameSpace)
 	name := request.PathParameter(constants.PodName)
 	containerId := request.PathParameter(constants.ContainerId)
-	code, err := deletePodFunc(na, namespace, name, containerId)
+	code, err := deletePodFunc(nm, namespace, name, containerId)
 	if err != nil {
 		klog.Error(err)
 	}
 	response.WriteHeader(code)
 }
 
-func deletePodWithLock(na *options.MasterAgent, namespace, name, ifname string) (int, error) {
-	na.Locker.Lock()
-	defer na.Locker.Unlock()
+func deletePodWithLock(nm *options.MasterAgent, namespace, name, ifname string) (int, error) {
+	nm.Locker.Lock()
+	defer nm.Locker.Unlock()
 	var opts []clientv3.Op
-	network, podIp, err := GetNetconf(na, namespace, name)
+	network, podIp, err := GetNetconf(nm, namespace, name)
 	if err != nil {
 		return 0, err
 	}
-	networkOps, err := na.Ipam.ReleaseIpFromNetwork(network, podIp)
+	networkOps, err := nm.Ipam.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
 		return 0, err
 	}
@@ -330,7 +331,7 @@ func deletePodWithLock(na *options.MasterAgent, namespace, name, ifname string) 
 	}
 	opts = append(opts, networkOps...)
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	if _, err = na.EtcdAgent.Client.Txn(ctx).Then(opts...).Commit(); err != nil {
+	if _, err = nm.EtcdAgent.Client.Txn(ctx).Then(opts...).Commit(); err != nil {
 		return 0, err
 	}
 	startTime := time.Now()

@@ -10,6 +10,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog/v2"
 	"net"
+	"time"
 )
 
 const prefix = "cni/ipam"
@@ -106,14 +107,14 @@ type IpamDriver struct {
 	//cidrCache   map[string]string
 }
 
-func NewIpamDriver(na *options.NodeAgent, crd k8s.NetworkCrd) (*IpamDriver, error) {
+func NewIpamDriver(na *options.NodeAgent, networkName string) (*IpamDriver, error) {
 	ipam := &IpamDriver{
 		K8sClient:   na.K8sAgent,
 		EtcdClient:  na.EtcdAgent,
-		NetWorkName: crd.Name,
+		NetWorkName: networkName,
 	}
 
-	key := etcd.NetWorkCrdLocksKey(crd.Name)
+	key := etcd.NetWorkCrdLocksKey(networkName)
 	mu := etcd.NewMutex(key, ipam.EtcdClient.Client)
 	ipam.Mu = mu
 	return ipam, nil
@@ -124,15 +125,15 @@ func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, err
 	netAddr := subnet.IP.Mask(subnet.Mask)
 
 	// Iterate over the IP addresses within the subnet.
-	for ip := netAddr.Mask(subnet.Mask); subnet.Contains(ip); Inc(ip) {
+	for ipAddr := netAddr.Mask(subnet.Mask); subnet.Contains(ipAddr); Inc(ipAddr) {
 		// Skip the network and broadcast addresses.
-		_, ok := AllocateIPMap[ip.String()]
-		if ip.Equal(subnet.IP) || ip.Equal(ones(subnet.IP)) || ok {
+		_, ok := AllocateIPMap[ipAddr.String()]
+		if ipAddr.Equal(subnet.IP) || ipAddr.Equal(ones(subnet.IP)) || ok {
 			continue
 		}
-		AllocateIPMap[ip.String()] = "1"
+		AllocateIPMap[ipAddr.String()] = "1"
 		// Return the currently allocated IP address.
-		return ip, nil
+		return ipAddr, nil
 	}
 
 	// If no valid IP address found, return an error.
@@ -160,6 +161,14 @@ func ones(ip net.IP) net.IP {
 }
 
 func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, opts []clientv3.Op, err error) {
+	for i := 0; i < 10; i++ {
+		if err = ipam.Mu.Lock(); err == nil {
+			break
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	defer ipam.Mu.Unlock()
 	networkKey := etcd.NetworkKey(network)
 	networkCrd, err := ipam.EtcdClient.GetNetwork(networkKey)
 	if err != nil {
@@ -205,6 +214,14 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 }
 
 func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) (opts []clientv3.Op, err error) {
+	for i := 0; i < 10; i++ {
+		if err = ipam.Mu.Lock(); err == nil {
+			break
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	defer ipam.Mu.Unlock()
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
