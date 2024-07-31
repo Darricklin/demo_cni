@@ -211,15 +211,16 @@ spec:
       namespace: kube-system
       labels:
         app: node-agent
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       tolerations:
-        - effect: NoSchedule
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
-        - key: CriticalAddonsOnly
-          operator: Exists
-      priorityClassName: system-node-critical
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoExecute
       serviceAccountName: node-agent
       containers:
         - name: node-agent
@@ -379,15 +380,14 @@ spec:
         app: master-agent
     spec:
       tolerations:
-        - effect: NoSchedule
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
-        - key: CriticalAddonsOnly
-          operator: Exists
-      priorityClassName: system-node-critical
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoExecute
       nodeSelector:
-        node-role.kubernetes.io/control-plane: ""
+        node-role.kubernetes.io/master: ""
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -545,7 +545,7 @@ spec:
 
 ---
 
-apiVersion: admissionregistration.k8s.io/v1
+apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
   name: validation-webhook-cfg
@@ -554,8 +554,6 @@ metadata:
 webhooks:
   - name: validate.cni.io
     failurePolicy: Fail
-    admissionReviewVersions: [ "v1","v1beta1" ]
-    sideEffects: None
     timeoutSeconds: 30
     clientConfig:
       service:
