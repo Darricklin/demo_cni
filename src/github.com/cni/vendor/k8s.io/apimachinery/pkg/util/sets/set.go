@@ -17,7 +17,7 @@ limitations under the License.
 package sets
 
 import (
-	"cmp"
+	cmp "github.com/google/go-cmp"
 	"sort"
 )
 
