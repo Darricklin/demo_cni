@@ -310,12 +310,12 @@ spec:
                 configMapKeyRef:
                   name: cni-config
                   key: log_level
-            - name: SERVER_BIND_HOST
+            - name: AGENT_HOST
               valueFrom:
                 configMapKeyRef:
                   name: node-agent-config
                   key: agent_host
-            - name: SERVER_BIND_PORT
+            - name: AGENT_PORT
               valueFrom:
                 configMapKeyRef:
                   name: node-agent-config
@@ -488,12 +488,12 @@ spec:
                 configMapKeyRef:
                   name: cni-config
                   key: log_level
-            - name: SERVER_BIND_HOST
+            - name: BIND_HOST
               valueFrom:
                 configMapKeyRef:
                   name: master-agent-config
                   key: bind_host
-            - name: SERVER_BIND_PORT
+            - name: BIND_PORT
               valueFrom:
                 configMapKeyRef:
                   name: master-agent-config
