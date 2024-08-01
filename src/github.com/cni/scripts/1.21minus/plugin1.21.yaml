@@ -367,11 +367,6 @@ spec:
   selector:
     matchLabels:
       app: master-agent
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 25%
-      maxSurge: 0
   template:
     metadata:
       name: master-agent
