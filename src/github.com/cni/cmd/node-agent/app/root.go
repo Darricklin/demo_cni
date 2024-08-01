@@ -80,13 +80,12 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rand.Seed(time.Now().UTC().UnixNano())
-	NewNodeAgentCmd(server.NewServerWithSignalHandler())
-	flags.InitFlags()
 	if err := logs.InitLogs(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 	defer logs.FlushLogs()
-
+	NewNodeAgentCmd(server.NewServerWithSignalHandler())
+	flags.InitFlags()
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
