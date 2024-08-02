@@ -47,9 +47,10 @@ func NewNodeAgentCmd(srv *server.Server) *cobra.Command {
 			return fmt.Errorf("node ip error format")
 		}
 		nodeAgent := &options.NodeAgent{
-			Server:   srv,
-			HostName: hostname,
-			HostIP:   hostIp,
+			Server:         srv,
+			HostName:       hostname,
+			HostIP:         hostIp,
+			NodeAgentFlags: *nodeFlags,
 		}
 		if err := RUN(nodeAgent); err != nil {
 			klog.Fatal(err)
