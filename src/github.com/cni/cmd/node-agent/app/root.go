@@ -8,15 +8,11 @@ import (
 	"github.com/cni/cmd/node-agent/app/constants"
 	"github.com/cni/cmd/node-agent/app/options"
 	"github.com/cni/pkg/util/flags"
-	"github.com/cni/pkg/util/logs"
 	"github.com/cni/pkg/util/server"
+	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
-	"math/rand"
 	"net"
 	"os"
-	"time"
-
-	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -31,7 +27,6 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-
 }
 
 func NewNodeAgentCmd(srv *server.Server) *cobra.Command {
@@ -80,13 +75,6 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rand.Seed(time.Now().UTC().UnixNano())
-	if err := logs.InitLogs(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-	defer logs.FlushLogs()
-	NewNodeAgentCmd(server.NewServerWithSignalHandler())
-	flags.InitFlags()
+
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

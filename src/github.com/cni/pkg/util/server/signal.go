@@ -10,7 +10,7 @@ import (
 
 var (
 	onlyOneSignalHandler = make(chan struct{})
-	shutdownSignals      = []os.Signal{os.Interrupt, syscall.SIGTERM}
+	shutdownSignals      = []os.Signal{syscall.SIGINT, syscall.SIGTERM}
 )
 
 func (s *Server) SetupSignalHandler() {

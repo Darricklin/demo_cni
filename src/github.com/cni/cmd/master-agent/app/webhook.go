@@ -34,9 +34,12 @@ func InitWebHook(nm *options.MasterAgent) error {
 	ws := new(restful.WebService)
 	ws.Path(constants.Base).Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
 
-	ws.Route(ws.POST(constants.Validate).To(func(request *restful.Request, response *restful.Response) {
-		ValidateRequest(nm, request, response)
-	}).Returns(http.StatusOK, http.StatusText(http.StatusOK), v1beta1.AdmissionReview{}).
+	ws.Route(ws.POST(constants.Validate).
+		To(func(request *restful.Request, response *restful.Response) { ValidateRequest(nm, request, response) }).
+		Doc("validate crd resources").
+		Reads(v1beta1.AdmissionReview{}).
+		Writes(v1beta1.AdmissionReview{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), v1beta1.AdmissionReview{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), ErrorResp{}))
 	wsContainer.Add(ws)
 	tlsCertKey, err := tls.LoadX509KeyPair(nm.TlsCertPath, nm.TlsKeyPath)
@@ -53,16 +56,17 @@ func InitWebHook(nm *options.MasterAgent) error {
 		return err
 	}
 	nm.StopWg.Add(1)
-	go startTLSServer(nm, &http.Server{Handler: wsContainer, TLSConfig: &tls.Config{Certificates: []tls.Certificate{tlsCertKey}}}, listener)
+	go startTLSServer(nm, &http.Server{Handler: wsContainer,
+		TLSConfig: &tls.Config{Certificates: []tls.Certificate{tlsCertKey}}}, listener, "", "")
 	klog.Infof("init webhook succeed")
 	return nil
 }
 
-func startTLSServer(nm *options.MasterAgent, server *http.Server, listener net.Listener) {
+func startTLSServer(nm *options.MasterAgent, server *http.Server, listener net.Listener, certFile, Keyfile string) {
 	defer nm.StopWg.Done()
 	stopCh := make(chan struct{})
 	go func() {
-		if err := server.ServeTLS(listener, nm.TlsCertPath, nm.TlsKeyPath); err != nil {
+		if err := server.ServeTLS(listener, certFile, Keyfile); err != nil {
 			klog.Error(err)
 			close(stopCh)
 		}

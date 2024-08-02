@@ -43,12 +43,15 @@ func RUN(na *options.NodeAgent) error {
 
 func run(na *options.NodeAgent) error {
 	if err := initEtcd(na); err != nil {
+		klog.Errorf("failed to init etcd ,err is %s", err)
 		return err
 	}
 	if err := initK8s(na); err != nil {
+		klog.Errorf("failed to init k8s ,err is %s", err)
 		return err
 	}
 	if err := initServer(na); err != nil {
+		klog.Errorf("failed to init server ,err is %s", err)
 		return err
 	}
 	return nil
@@ -153,12 +156,13 @@ func startServer(na *options.NodeAgent, server *http.Server, listener net.Listen
 	stopCh := make(chan struct{})
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			klog.Error(err)
+			klog.Error("failed to start server,err is %s", err)
 			close(stopCh)
 		}
 	}()
 	select {
 	case <-na.Done():
+		klog.Errorf("receive na done, shutdown node agent")
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := server.Shutdown(ctx); err != nil {
 			klog.Error(err)

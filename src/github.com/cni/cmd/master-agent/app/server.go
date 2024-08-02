@@ -31,16 +31,19 @@ func RUN(nm *options.MasterAgent) error {
 
 func run(nm *options.MasterAgent) error {
 	if err := initEtcd(nm); err != nil {
-		klog.Errorf("failed ")
+		klog.Errorf("failed to init etcdAgent ,err is %s", err)
 		return err
 	}
 	if err := initK8s(nm); err != nil {
+		klog.Errorf("failed to init k8sAgent ,err is %s", err)
 		return err
 	}
 	if err := initServer(nm); err != nil {
+		klog.Errorf("failed to init master server app ,err is %s", err)
 		return err
 	}
 	if err := InitWebHook(nm); err != nil {
+		klog.Errorf("failed to init webhook app ,err is %s", err)
 		return err
 	}
 	nm.AddReport(func() {
@@ -129,6 +132,7 @@ func startServer(nm *options.MasterAgent, server *http.Server, listener net.List
 	}()
 	select {
 	case <-nm.Done():
+		klog.Errorf("receive nm Done,shut down master server")
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := server.Shutdown(ctx); err != nil {
 			klog.Errorf("failed to shutdown server; err is %s", err)

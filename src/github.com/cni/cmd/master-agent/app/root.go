@@ -4,16 +4,12 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package app
 
 import (
-	"fmt"
 	"github.com/cni/cmd/master-agent/app/options"
 	"github.com/cni/pkg/util/flags"
-	"github.com/cni/pkg/util/logs"
 	"github.com/cni/pkg/util/server"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
-	"math/rand"
 	"os"
-	"time"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -66,13 +62,6 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rand.Seed(time.Now().UTC().UnixNano())
-	if err := logs.InitLogs(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-	defer logs.FlushLogs()
-	NewMasterCommand(server.NewServerWithSignalHandler())
-	flags.InitFlags()
+
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
