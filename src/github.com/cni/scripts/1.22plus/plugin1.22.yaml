@@ -358,7 +358,7 @@ spec:
               readOnly: false
           livenessProbe:
             httpGet:
-              path: /version
+              path: /v1.0/version
               port: 9102
             initialDelaySeconds: 60
             periodSeconds: 60
@@ -561,7 +561,7 @@ spec:
               readOnly: true
           livenessProbe:
             httpGet:
-              path: /version
+              path: /v1.0/version
               port: 9100
             initialDelaySeconds: 60
             periodSeconds: 60

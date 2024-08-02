@@ -51,8 +51,11 @@ func run(na *options.NodeAgent) error {
 		return err
 	}
 	if err := initServer(na); err != nil {
-		klog.Errorf("failed to init server ,err is %s", err)
+		klog.Errorf("failed to init node agent server ,err is %s", err)
 		return err
+	}
+	if err := initHttpServer(na); err != nil {
+		klog.Errorf("failed to init node agent health server ,err is %s", err)
 	}
 	return nil
 }
@@ -89,7 +92,7 @@ func initK8s(na *options.NodeAgent) error {
 }
 
 func initServer(na *options.NodeAgent) error {
-	klog.Info("init server ")
+	klog.Info("init node agent server ")
 	wscontainer := restful.NewContainer()
 	wscontainer.Router(restful.CurlyRouter{})
 	ws := new(restful.WebService)
@@ -114,8 +117,8 @@ func initServer(na *options.NodeAgent) error {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), HealthResp{}))
 	ws.Route(ws.GET(constants.Version).To(GetVersion(na)).
 		Doc("get server health").
-		Writes(HealthResp{}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), HealthResp{}))
+		Writes(VersionResp{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
 	wscontainer.Add(ws)
 	unixListener, err := rest.NewUnixListener(constants.NodeAgentSock)
 	if err != nil {
@@ -123,6 +126,35 @@ func initServer(na *options.NodeAgent) error {
 	}
 	na.StopWg.Add(1)
 	go startServer(na, &http.Server{Handler: wscontainer}, unixListener)
+	return nil
+}
+
+func initHttpServer(na *options.NodeAgent) error {
+	klog.Info("init node agent health server ")
+	wscontainer := restful.NewContainer()
+	wscontainer.Router(restful.CurlyRouter{})
+	ws := new(restful.WebService)
+	ws.Path(constants.Base).Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
+	ws.Route(ws.GET(constants.Health).To(GetHealth(na)).
+		Doc("get server health").
+		Writes(HealthResp{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), HealthResp{}))
+	ws.Route(ws.GET(constants.Version).To(GetVersion(na)).
+		Doc("get server health").
+		Writes(VersionResp{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
+	wscontainer.Add(ws)
+	addr := fmt.Sprintf("%s:%s", na.AgentHost, na.AgentPort)
+	listenAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return err
+	}
+	listener, err := net.ListenTCP("tcp", listenAddr)
+	if err != nil {
+		return err
+	}
+	na.StopWg.Add(1)
+	go startServer(na, &http.Server{Handler: wscontainer}, listener)
 	return nil
 }
 

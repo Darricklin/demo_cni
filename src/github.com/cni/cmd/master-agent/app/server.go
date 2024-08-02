@@ -96,8 +96,8 @@ func initServer(nm *options.MasterAgent) error {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), HealthResp{}))
 	ws.Route(ws.GET(constants.Version).To(GetVersion(nm)).
 		Doc("get server health").
-		Writes(HealthResp{}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), HealthResp{}))
+		Writes(VersionResp{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
 	wscontainer.Add(ws)
 	addr := fmt.Sprintf("%s:%s", nm.BindHost, nm.BindPort)
 	listenerAddr, err := net.ResolveTCPAddr("tcp", addr)
