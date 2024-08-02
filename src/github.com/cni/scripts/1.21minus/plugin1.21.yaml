@@ -472,9 +472,9 @@ spec:
             - $(BIND_HOST)
             - --bind-port
             - $(BIND_PORT)
-            - tlsCertPath
+            - --tlsCertPath
             - /etc/webhook/certs/cert.pem
-            - tlsKeyPath
+            - --tlsKeyPath
             - /etc/webhook/certs/key.pem
           env:
             - name: ETCD_SERVERS
