@@ -29,7 +29,9 @@ func NewUnixListener(unixSockAddr string) (net.Listener, error) {
 }
 
 func NewHttpClientUnix(unixSockAddr string) *http.Client {
-	return &http.Client{Transport: &http.Transport{DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-		return net.Dial("unix", unixSockAddr)
-	}}}
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", unixSockAddr)
+			}}}
 }

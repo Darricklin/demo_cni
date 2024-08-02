@@ -89,6 +89,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if podNamespace == "" || podName == "" {
 		return logErrorf("required CNI variable missing")
 	}
+
 	logInfof("receive pod creation event: namespace %s,pod %s,ns %s,containerID %s", podNamespace, podName, args.Netns, args.ContainerID)
 	result := types020.Result{
 		CNIVersion: n.CNIVersion,
@@ -118,9 +119,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func createPod(pod app.Pod) (app.PodResponse, error) {
-	client := rest.Client{
-		Client: rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix").Client,
-	}
+	client := rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix")
+
 	url := fmt.Sprintf("%s%s", constants.Base, constants.Ports)
 	var result app.PodResponse
 	logInfof("send pod creation request : %+v", pod)
@@ -162,9 +162,7 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func deletePod(namespace, name, ifname string) error {
-	client := rest.Client{
-		Client: rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix").Client,
-	}
+	client := rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix")
 	url := fmt.Sprintf("%s%s/%s/%s/%s", constants.Base, constants.Ports, namespace, name, ifname)
 	logInfof("send pod deletion request: pod namespace, pod name, pod ifname", namespace, name, ifname)
 	code, err := client.Request("DELETE", url, nil, nil)

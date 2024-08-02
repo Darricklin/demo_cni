@@ -41,6 +41,7 @@ func RUN(nm *options.MasterAgent) error {
 
 func run(nm *options.MasterAgent) error {
 	if err := initEtcd(nm); err != nil {
+		klog.Errorf("failed ")
 		return err
 	}
 	if err := initK8s(nm); err != nil {
@@ -49,6 +50,9 @@ func run(nm *options.MasterAgent) error {
 	if err := initServer(nm); err != nil {
 		return err
 	}
+	nm.AddReport(func() {
+		klog.V(1).Infoln(nm)
+	})
 	return nil
 }
 func initEtcd(nm *options.MasterAgent) error {
@@ -124,6 +128,7 @@ func initServer(nm *options.MasterAgent) error {
 	}
 	nm.StopWg.Add(1)
 	go startServer(nm, &http.Server{Handler: wscontainer}, listener)
+	klog.Info("start server succeed")
 	return nil
 }
 
@@ -157,7 +162,7 @@ func startServer(nm *options.MasterAgent, server *http.Server, listener net.List
 	stopCh := make(chan struct{})
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			klog.Error(err)
+			klog.Errorf("failed to start server; err is %s", err)
 			close(stopCh)
 		}
 	}()
@@ -165,7 +170,7 @@ func startServer(nm *options.MasterAgent, server *http.Server, listener net.List
 	case <-nm.Done():
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := server.Shutdown(ctx); err != nil {
-			klog.Error(err)
+			klog.Errorf("failed to shutdown server; err is %s", err)
 		}
 		cancel()
 		<-stopCh
