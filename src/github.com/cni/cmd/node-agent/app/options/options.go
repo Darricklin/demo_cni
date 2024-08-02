@@ -45,8 +45,8 @@ func NewNodeAgentFlags() *NodeAgentFlags {
 }
 
 func (s *NodeAgentFlags) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&s.AgentHost, "bind-host", s.AgentHost, "the bind host of master agent")
-	fs.StringVar(&s.AgentPort, "bind-port", s.AgentPort, "the bind port of master agent")
+	fs.StringVar(&s.AgentHost, "agent-host", s.AgentHost, "the bind host of node agent")
+	fs.StringVar(&s.AgentPort, "agent-port", s.AgentPort, "the bind port of node agent")
 	s.K8sFlags.AddFlags(fs)
 	s.EtcdFlags.AddFlags(fs)
 }
