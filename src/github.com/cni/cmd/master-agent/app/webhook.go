@@ -274,7 +274,7 @@ func ValidateRequest(nm *options.MasterAgent, request *restful.Request, response
 	klog.Infof("AdmissionReview for Kind=%v, NameSpace=%v, Name=%v, UID=%v, patchOperation=%v, UserInfo=%v",
 		req.Kind, req.Namespace, req.Name, req.UID, req.Operation, req.UserInfo)
 	switch req.Kind.Kind {
-	case "Network":
+	case "NetworkAttachmentDefinition":
 		err := validateNetwork(nm, req)
 		if err != nil {
 			klog.Error(err)
