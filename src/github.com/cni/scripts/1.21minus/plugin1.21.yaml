@@ -335,6 +335,27 @@ spec:
             - mountPath: /etc/cni-plugin/
               name: cni-config-etc-dir
               readOnly: false
+            - mountPath: /opt/cni/bin/
+              name: cni-bin-dir
+              readOnly: false
+            - mountPath: /etc/cni/net.d/
+              name: cni-etc-dir
+              readOnly: false
+            - mountPath: /var/run/
+              name: var-run-dir
+              readOnly: false
+            - mountPath: /lib64/
+              name: lib64
+              readOnly: false
+            - mountPath: /usr/bin
+              name: usr-bin-dir
+              readOnly: false
+            - mountPath: /usr/sbin
+              name: usr-sbin-dir
+              readOnly: false
+            - mountPath: /run/node-agent-cni/
+              name: node-agent-socket
+              readOnly: false
             - mountPath: /etc/localtime
               name: localtime
               readOnly: false
@@ -352,6 +373,27 @@ spec:
         - name: cni-config-etc-dir
           hostPath:
             path: /etc/cni-plugin/
+        - name: cni-bin-dir
+          hostPath:
+            path: /opt/cni/bin/
+        - name: cni-etc-dir
+          hostPath:
+            path: /etc/cni/net.d/
+        - name: var-run-dir
+          hostPath:
+            path: /var/run/
+        - name: lib64
+          hostPath:
+            path: /lib64/
+        - name: usr-bin-dir
+          hostPath:
+            path: /usr/bin/
+        - name: usr-sbin-dir
+          hostPath:
+            path: /usr/sbin/
+        - name: node-agent-socket
+          hostPath:
+            path: /run/node-agent-cni/
         - name: localtime
           hostPath:
             path: /etc/localtime
