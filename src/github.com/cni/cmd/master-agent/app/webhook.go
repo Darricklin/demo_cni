@@ -54,6 +54,7 @@ func InitWebHook(nm *options.MasterAgent) error {
 	}
 	nm.StopWg.Add(1)
 	go startTLSServer(nm, &http.Server{Handler: wsContainer, TLSConfig: &tls.Config{Certificates: []tls.Certificate{tlsCertKey}}}, listener)
+	klog.Infof("init webhook succeed")
 	return nil
 }
 
