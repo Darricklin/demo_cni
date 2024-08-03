@@ -2,7 +2,7 @@ local.yaml
 
 .idea/
 latest_log
-vendor/
+#vendor/
 # Binaries for programs and plugins
 *.exe
 *.exe~
