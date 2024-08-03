@@ -1,0 +1,607 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cni-config
+  namespace: kube-system
+data:
+  etcd_servers: "http://6.0.0.11:2379"
+  etcd_certfile: ""
+  etcd_keyfile: ""
+  etcd_cafile: ""
+  k8s_api_server: "https://2.2.0.15:6443"
+  k8s_ca: "/etc/cni-plugin/ca.crt"
+  k8s_key: "/etc/cni-plugin/apiserver-kubelet-client.key"
+  k8s_cert: "/etc/cni-plugin/apiserver-kubelet-client.crt"
+  k8s_token: ""
+  log_dir: "/var/log/cni-plugin/"
+  log_level: "1"
+
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: master-agent-config
+  namespace: kube-system
+data:
+  bind_host: "0.0.0.0"
+  bind_port: "9100"
+  protocol: "http"
+  webhook_bind_port: "9101"
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: node-agent-config
+  namespace: kube-system
+data:
+  agent_host: "0.0.0.0"
+  agent_port: "9102"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: master-agent-service
+  namespace: kube-system
+spec:
+  selector:
+    app: master-agent
+  ports:
+    - name: api-port
+      port: 9100
+      protocol: TCP
+      targetPort: 9100
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: master-webhook-service
+  namespace: kube-system
+spec:
+  selector:
+    app: master-agent
+  ports:
+    - name: webhook-port
+      port: 443
+      protocol: TCP
+      targetPort: 9101
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: node-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-agent
+subjects:
+  - kind: ServiceAccount
+    name: node-agent
+    namespace: kube-system
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: node-agent
+  namespace: kube-system
+rules:
+  - apiGroups: [ "k8s.cni.cncf.io" ]
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+      - extensions
+    resources:
+      - services
+      - pods
+      - namespaces
+      - endpoints
+    verbs:
+      - get
+      - patch
+      - watch
+      - list
+      - update
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - watch
+      - list
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-agent
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: master-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: master-agent
+subjects:
+  - kind: ServiceAccount
+    name: master-agent
+    namespace: kube-system
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: master-agent
+  namespace: kube-system
+rules:
+  - apiGroups: [ "k8s.cni.cncf.io" ]
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+      - extensions
+    resources:
+      - services
+      - pods
+      - namespaces
+      - endpoints
+    verbs:
+      - get
+      - patch
+      - watch
+      - list
+      - update
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - watch
+      - list
+
+---
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: master-agent
+  namespace: kube-system
+
+---
+
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: kube-system
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 0
+  template:
+    metadata:
+      name: node-agent
+      namespace: kube-system
+      labels:
+        app: node-agent
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoExecute
+      serviceAccountName: node-agent
+      containers:
+        - name: node-agent
+          image: k8s.io/node-agent:v1.0
+          args:
+            - --role
+            - node
+            - --etcd-servers
+            - $(ETCD_SERVERS)
+            - --etcd-certfile
+            - $(ETCD_CERTFILE)
+            - --etcd-keyfile
+            - $(ETCD_KEYFILE)
+            - --etcd-cafile
+            - $(ETCD_CAFILE)
+            - --k8s-api-server
+            - $(K8S_API_SERVER)
+            - --k8s-ca
+            - $(K8S_CA)
+            - --k8s-key
+            - $(K8S_KEY)
+            - --k8s-cert
+            - $(K8S_CERT)
+            - --k8s-token
+            - $(K8S_TOKEN)
+            - --log-dir
+            - $(LOG_DIR)
+            - --log-level
+            - $(LOG_LEVEL)
+            - --agent-host
+            - $(AGENT_HOST)
+            - --agent-port
+            - $(AGENT_PORT)
+          env:
+            - name: ETCD_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_servers
+            - name: ETCD_CERTFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_certfile
+            - name: ETCD_KEYFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_keyfile
+            - name: ETCD_CAFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_cafile
+            - name: K8S_API_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_api_server
+            - name: K8S_CA
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_ca
+            - name: K8S_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_key
+            - name: K8S_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_cert
+            - name: K8S_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_token
+            - name: LOG_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_dir
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_level
+            - name: AGENT_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: node-agent-config
+                  key: agent_host
+            - name: AGENT_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: node-agent-config
+                  key: agent_port
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/log/cni-plugin/
+              name: cni-config-log-dir
+              readOnly: false
+            - mountPath: /etc/cni-plugin/
+              name: cni-config-etc-dir
+              readOnly: false
+            - mountPath: /opt/cni/bin/
+              name: cni-bin-dir
+              readOnly: false
+            - mountPath: /etc/cni/net.d/
+              name: cni-etc-dir
+              readOnly: false
+            - mountPath: /var/run/
+              name: var-run-dir
+              readOnly: false
+            - mountPath: /lib64/
+              name: lib64
+              readOnly: false
+            - mountPath: /usr/bin
+              name: usr-bin-dir
+              readOnly: false
+            - mountPath: /usr/sbin
+              name: usr-sbin-dir
+              readOnly: false
+            - mountPath: /run/node-agent-cni/
+              name: node-agent-socket
+              readOnly: false
+            - mountPath: /etc/localtime
+              name: localtime
+              readOnly: false
+          livenessProbe:
+            httpGet:
+              path: /v1.0/version
+              port: 9102
+            initialDelaySeconds: 60
+            periodSeconds: 60
+      restartPolicy: Always
+      volumes:
+        - name: cni-config-log-dir
+          hostPath:
+            path: /var/log/cni-plugin/
+        - name: cni-config-etc-dir
+          hostPath:
+            path: /etc/cni-plugin/
+        - name: cni-bin-dir
+          hostPath:
+            path: /opt/cni/bin/
+        - name: cni-etc-dir
+          hostPath:
+            path: /etc/cni/net.d/
+        - name: var-run-dir
+          hostPath:
+            path: /var/run/
+        - name: lib64
+          hostPath:
+            path: /lib64/
+        - name: usr-bin-dir
+          hostPath:
+            path: /usr/bin/
+        - name: usr-sbin-dir
+          hostPath:
+            path: /usr/sbin/
+        - name: node-agent-socket
+          hostPath:
+            path: /run/node-agent-cni/
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: master-agent
+  namespace: kube-system
+  labels:
+    app: master-agent
+spec:
+  selector:
+    matchLabels:
+      app: master-agent
+  template:
+    metadata:
+      name: master-agent
+      namespace: kube-system
+      labels:
+        app: master-agent
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          effect: NoExecute
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - master-agent
+              topologyKey: kubernetes.io/hostname
+      hostPID: true
+      hostNetwork: true
+      serviceAccountName: master-agent
+      containers:
+        - name: master-agent
+          image: k8s.io/node-agent:v1.0
+          args:
+            - --role
+            - master
+            - --etcd-servers
+            - $(ETCD_SERVERS)
+            - --etcd-certfile
+            - $(ETCD_CERTFILE)
+            - --etcd-keyfile
+            - $(ETCD_KEYFILE)
+            - --etcd-cafile
+            - $(ETCD_CAFILE)
+            - --k8s-api-server
+            - $(K8S_API_SERVER)
+            - --k8s-ca
+            - $(K8S_CA)
+            - --k8s-key
+            - $(K8S_KEY)
+            - --k8s-cert
+            - $(K8S_CERT)
+            - --k8s-token
+            - $(K8S_TOKEN)
+            - --log-dir
+            - $(LOG_DIR)
+            - --log-level
+            - $(LOG_LEVEL)
+            - --bind-host
+            - $(BIND_HOST)
+            - --bind-port
+            - $(BIND_PORT)
+            - --tlsCertPath
+            - /etc/webhook/certs/cert.pem
+            - --tlsKeyPath
+            - /etc/webhook/certs/key.pem
+          env:
+            - name: ETCD_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_servers
+            - name: ETCD_CERTFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_certfile
+            - name: ETCD_KEYFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_keyfile
+            - name: ETCD_CAFILE
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: etcd_cafile
+            - name: K8S_API_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_api_server
+            - name: K8S_CA
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_ca
+            - name: K8S_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_key
+            - name: K8S_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_cert
+            - name: K8S_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: k8s_token
+            - name: LOG_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_dir
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: cni-config
+                  key: log_level
+            - name: BIND_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: master-agent-config
+                  key: bind_host
+            - name: BIND_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: master-agent-config
+                  key: bind_port
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /var/log/cni-plugin/
+              name: cni-config-log-dir
+              readOnly: false
+            - mountPath: /etc/cni-plugin/
+              name: cni-config-etc-dir
+              readOnly: false
+            - mountPath: /etc/localtime
+              name: localtime
+              readOnly: false
+            - mountPath: /etc/webhook/certs
+              name: webhook-certs
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /v1.0/version
+              port: 9100
+            initialDelaySeconds: 60
+            periodSeconds: 60
+      restartPolicy: Always
+      volumes:
+        - name: cni-config-log-dir
+          hostPath:
+            path: /var/log/cni-plugin/
+        - name: cni-config-etc-dir
+          hostPath:
+            path: /etc/cni-plugin/
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+        - name: webhook-certs
+          secret:
+            secretName: master-webhook-certs
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: validation-webhook-cfg
+  labels:
+    app: admission-webhook-network
+webhooks:
+  - name: validate.cni.io
+    failurePolicy: Fail
+    timeoutSeconds: 30
+    clientConfig:
+      service:
+        name: master-webhook-service
+        namespace: kube-system
+        path: "/v1.0/validate"
+      caBundle: ""
+    rules:
+      - operations: [ "CREATE", "UPDATE", "DELETE" ]
+        apiGroups: [ "k8s.cni.cncf.io" ]
+        apiVersions: [ "v1" ]
+        resources: [ "network-attachment-definitions" ]
