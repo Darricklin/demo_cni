@@ -312,12 +312,12 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		klog.Error(err)
 	}
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
-	podIpconfig := &types100.IPConfig{
+	podIpConfig := &types100.IPConfig{
 		Interface: types100.Int(1),
 		Address:   podIp.IPNet,
 		Gateway:   gwIp.IP,
 	}
-	result.IPs = []*types100.IPConfig{podIpconfig}
+	result.IPs = []*types100.IPConfig{podIpConfig}
 	etcdCli, err := etcd.NewClient(etcd.NewEtcdFlags())
 	if err != nil {
 		return 400, podResp, err
@@ -489,23 +489,23 @@ func configureSysctls(hostVethName string, hasIPv4, hasIPv6 bool) error {
 }
 
 func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface, *types100.Interface, error) {
-	hostinterface := &types100.Interface{}
-	continterface := &types100.Interface{}
-	// 创建vethpair，配置容器ip，默认路由，mtu
+	hostInterface := &types100.Interface{}
+	contInterface := &types100.Interface{}
+	// 创建vethPair，配置容器ip，默认路由，mtu
 	err := netNs.Do(func(hostNs ns.NetNS) error {
 		_, containerVeth, err := ip.SetupVethWithName(ifName, hostVethName, mtu, podMac, hostNs)
 		if err != nil {
 			return err
 		}
-		continterface.Name = containerVeth.Name
-		continterface.Mac = containerVeth.HardwareAddr.String()
-		continterface.Sandbox = netNs.Path()
-		contlink, err := netlink.LinkByName(containerVeth.Name)
+		contInterface.Name = containerVeth.Name
+		contInterface.Mac = containerVeth.HardwareAddr.String()
+		contInterface.Sandbox = netNs.Path()
+		contLink, err := netlink.LinkByName(containerVeth.Name)
 		if err != nil {
 			return err
 		}
 
-		err = netlink.AddrAdd(contlink, &netlink.Addr{IPNet: &podIp.IPNet})
+		err = netlink.AddrAdd(contLink, &netlink.Addr{IPNet: &podIp.IPNet})
 		if err != nil {
 			return err
 		}
@@ -519,36 +519,36 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 			podGw.IP = net.IPv4(169, 254, 1, 1)
 		}
 		defaultRoute := &types.Route{Dst: defaultNet, GW: podGw.IP}
-		err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, contlink)
+		err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, contLink)
 		if err != nil {
 			return err
 		}
-		if err := netlink.LinkSetMTU(contlink, mtu); err != nil {
+		if err := netlink.LinkSetMTU(contLink, mtu); err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return hostinterface, continterface, err
+		return hostInterface, contInterface, err
 	}
 
 	// 配置默认的mac，mtu，路由
-	hostlink, err := netlink.LinkByName(hostVethName)
+	hostLink, err := netlink.LinkByName(hostVethName)
 	if err != nil {
-		return hostinterface, continterface, err
+		return hostInterface, contInterface, err
 	}
-	hardwareaddr, err := net.ParseMAC(constants.HostVethMac)
+	hardwareAddr, err := net.ParseMAC(constants.HostVethMac)
 	if err != nil {
-		return hostinterface, continterface, err
+		return hostInterface, contInterface, err
 	}
-	if err := netlink.LinkSetHardwareAddr(hostlink, hardwareaddr); err != nil {
-		return hostinterface, continterface, err
+	if err := netlink.LinkSetHardwareAddr(hostLink, hardwareAddr); err != nil {
+		return hostInterface, contInterface, err
 	}
-	if err := netlink.LinkSetMTU(hostlink, mtu); err != nil {
-		return hostinterface, continterface, err
+	if err := netlink.LinkSetMTU(hostLink, mtu); err != nil {
+		return hostInterface, contInterface, err
 	}
-	hostinterface.Name = hostVethName
-	hostinterface.Mac = constants.HostVethMac
+	hostInterface.Name = hostVethName
+	hostInterface.Mac = constants.HostVethMac
 	podIPNet := net.IPNet{}
 	hasIpv4 := false
 	hasIpv6 := false
@@ -562,15 +562,15 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 		hasIpv6 = true
 	}
 	defaultRoute := &types.Route{Dst: podIPNet, GW: podGw.IP}
-	err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, hostlink)
+	err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, hostLink)
 	if err != nil {
-		return hostinterface, continterface, err
+		return hostInterface, contInterface, err
 	}
 	err = configureSysctls(hostVethName, hasIpv4, hasIpv6)
 	if err != nil {
-		return hostinterface, continterface, err
+		return hostInterface, contInterface, err
 	}
-	return hostinterface, continterface, err
+	return hostInterface, contInterface, err
 }
 
 func Min(a, b int) int {

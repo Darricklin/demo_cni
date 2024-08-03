@@ -140,7 +140,7 @@ func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, err
 	return nil, fmt.Errorf("no available IP address in the subnet")
 }
 
-// Increment IP address
+// Inc Increment IP address
 func Inc(ip net.IP) {
 	for j := len(ip) - 1; j >= 0; j-- {
 		ip[j]++
@@ -150,7 +150,7 @@ func Inc(ip net.IP) {
 	}
 }
 
-// Get the broadcast address
+// ones Get the broadcast address
 func ones(ip net.IP) net.IP {
 	ipLen := len(ip)
 	result := make(net.IP, ipLen)

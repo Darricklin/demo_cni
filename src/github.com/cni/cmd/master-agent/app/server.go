@@ -8,7 +8,7 @@ import (
 	"github.com/cni/pkg/util/etcd"
 	"github.com/cni/pkg/util/k8s"
 	"github.com/emicklei/go-restful/v3"
-	clientset "k8s.io/client-go/kubernetes"
+	clientSet "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"net"
@@ -75,7 +75,7 @@ func initK8s(nm *options.MasterAgent) error {
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet config: %s", err)
 	}
-	k8sClientSet, err := clientset.NewForConfig(k8sConfig)
+	k8sClientSet, err := clientSet.NewForConfig(k8sConfig)
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet : %s", err)
 	}
