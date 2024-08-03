@@ -78,11 +78,11 @@ func initK8s(na *options.NodeAgent) error {
 	na.K8sAgent = k8sAgent
 	klog.Infof("init k8s agent succeed")
 	klog.Infof("init k8s clientSet")
-	k8sconfig, err := clientcmd.BuildConfigFromFlags("", "")
+	k8sConfig, err := clientcmd.BuildConfigFromFlags("", "")
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet config: %s", err)
 	}
-	k8sClientSet, err := clientset.NewForConfig(k8sconfig)
+	k8sClientSet, err := clientset.NewForConfig(k8sConfig)
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet : %s", err)
 	}
@@ -93,8 +93,8 @@ func initK8s(na *options.NodeAgent) error {
 
 func initServer(na *options.NodeAgent) error {
 	klog.Info("init node agent server ")
-	wscontainer := restful.NewContainer()
-	wscontainer.Router(restful.CurlyRouter{})
+	wsContainer := restful.NewContainer()
+	wsContainer.Router(restful.CurlyRouter{})
 	ws := new(restful.WebService)
 	ws.Path(constants.Base).Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
 	ws.Route(ws.POST(constants.Ports).
@@ -119,20 +119,20 @@ func initServer(na *options.NodeAgent) error {
 		Doc("get server health").
 		Writes(VersionResp{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
-	wscontainer.Add(ws)
+	wsContainer.Add(ws)
 	unixListener, err := rest.NewUnixListener(constants.NodeAgentSock)
 	if err != nil {
 		return fmt.Errorf("failed to create sock %s : %v", constants.NodeAgentSock, err)
 	}
 	na.StopWg.Add(1)
-	go startServer(na, &http.Server{Handler: wscontainer}, unixListener)
+	go startServer(na, &http.Server{Handler: wsContainer}, unixListener)
 	return nil
 }
 
 func initHttpServer(na *options.NodeAgent) error {
 	klog.Info("init node agent health server ")
-	wscontainer := restful.NewContainer()
-	wscontainer.Router(restful.CurlyRouter{})
+	wsContainer := restful.NewContainer()
+	wsContainer.Router(restful.CurlyRouter{})
 	ws := new(restful.WebService)
 	ws.Path(constants.Base).Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
 	ws.Route(ws.GET(constants.Health).To(GetHealth(na)).
@@ -143,7 +143,7 @@ func initHttpServer(na *options.NodeAgent) error {
 		Doc("get server health").
 		Writes(VersionResp{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
-	wscontainer.Add(ws)
+	wsContainer.Add(ws)
 	addr := fmt.Sprintf("%s:%s", na.AgentHost, na.AgentPort)
 	listenAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -154,7 +154,7 @@ func initHttpServer(na *options.NodeAgent) error {
 		return err
 	}
 	na.StopWg.Add(1)
-	go startServer(na, &http.Server{Handler: wscontainer}, listener)
+	go startServer(na, &http.Server{Handler: wsContainer}, listener)
 	return nil
 }
 
@@ -207,7 +207,7 @@ func startServer(na *options.NodeAgent, server *http.Server, listener net.Listen
 		break
 	}
 }
-func GetHealth(na *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
+func GetHealth(_ *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		health := HealthResp{Health: "ok"}
 		if err := response.WriteEntity(health); err != nil {
@@ -215,7 +215,7 @@ func GetHealth(na *options.NodeAgent) func(request *restful.Request, response *r
 		}
 	}
 }
-func GetVersion(na *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
+func GetVersion(_ *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		version := VersionResp{
 			Version: "v1.0",
@@ -251,7 +251,7 @@ func ProcessCreatePod(na *options.NodeAgent, request *restful.Request, response 
 }
 
 func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) {
-	lables, annos, podIP, err := na.K8sAgent.GetPodAnnoAndLabels(ns, name)
+	labels, annos, podIP, err := na.K8sAgent.GetPodAnnoAndLabels(ns, name)
 	if err != nil {
 		return "", "", err
 	}
@@ -261,7 +261,7 @@ func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) 
 		} else {
 			return "", "", fmt.Errorf("wrong network")
 		}
-	} else if networkName, ok := lables[constants.NETWORK]; ok {
+	} else if networkName, ok := labels[constants.NETWORK]; ok {
 		if networkName != "" {
 			return networkName, podIP, nil
 		} else {
