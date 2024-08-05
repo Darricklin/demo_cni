@@ -103,12 +103,13 @@ func initServer(na *options.NodeAgent) error {
 		Writes(PodResponse{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), PodResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
-	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName)).
+	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
 		To(DeletePod(na)).
 		Doc("delete a Pod").
 		Param(ws.PathParameter(constants.PodNameSpace, "identifier of the pod namespace").DataType("string")).
 		Param(ws.PathParameter(constants.PodName, "identifier of the pod name").DataType("string")).
 		Param(ws.PathParameter(constants.IFName, "identifier of the ifname").DataType("string")).
+		Param(ws.PathParameter(constants.Netns, "identifier of the netns").DataType("string")).
 		Returns(http.StatusNoContent, http.StatusText(http.StatusNoContent), nil))
 	ws.Route(ws.GET(constants.Health).To(GetHealth(na)).
 		Doc("get server health").
@@ -336,18 +337,19 @@ func DeletePod(na *options.NodeAgent) func(request *restful.Request, response *r
 }
 
 func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response *restful.Response,
-	deletePodFunc func(*options.NodeAgent, string, string, string) (int, error)) {
+	deletePodFunc func(*options.NodeAgent, string, string, string, string) (int, error)) {
 	namespace := request.PathParameter(constants.PodNameSpace)
 	name := request.PathParameter(constants.PodName)
 	ifname := request.PathParameter(constants.IFName)
-	code, err := deletePodFunc(na, namespace, name, ifname)
+	netns := request.PathParameter(constants.Netns)
+	code, err := deletePodFunc(na, namespace, name, ifname, netns)
 	if err != nil {
 		klog.Error(err)
 	}
 	response.WriteHeader(code)
 }
 
-func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (int, error) {
+func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns string) (int, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
 
@@ -363,9 +365,9 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (i
 	if err != nil {
 		return 0, err
 	}
-	podNs, err := ns.GetNS(namespace)
+	podNs, err := ns.GetNS(netns)
 	if err != nil {
-		klog.Errorf("failed to get ns of pod %s %s", namespace, name)
+		klog.Errorf("failed to get ns [%s] of pod %s %s", netns, namespace, name)
 		return 0, err
 	}
 

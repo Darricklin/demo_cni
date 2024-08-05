@@ -9,6 +9,7 @@ const (
 	PodNameSpace  = "pod-namespace"
 	ContainerId   = "container-id"
 	IFName        = "ifname"
+	Netns         = "netns"
 	Version       = "/version"
 )
 
