@@ -226,7 +226,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 			return nil
 		}
 	case v1beta1.Delete:
-		klog.Errorf("======delete crd %v", network.Name)
+		klog.Errorf("======delete crd %v", request.Name)
 		allPodList, err := nm.K8sAgent.GetPodList()
 		if err != nil {
 			return err
@@ -235,7 +235,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 			if networkAnno, ok := pod.MetaData.Annotations[constants.NETWORK]; ok {
 				networkInfo := strings.Split(networkAnno, "/")
 				if len(networkInfo) == 2 {
-					if network.Name == networkInfo[1] {
+					if request.Name == networkInfo[1] {
 						return fmt.Errorf("network used by pod,cannot delete")
 					}
 				}
@@ -244,7 +244,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 		var ops []clientv3.Op
 		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 		txn := nm.EtcdAgent.Client.Txn(ctx)
-		op := etcd.OpDeleteNetwork(network.Name)
+		op := etcd.OpDeleteNetwork(request.Name)
 		ops = append(ops, op)
 		if len(ops) > 0 {
 			if _, err := txn.Then(ops...).Commit(); err != nil {
