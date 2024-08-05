@@ -140,6 +140,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	//// If no valid IP address found, return an error.
 	for i := 0; i < 10; i++ {
 		if err := ipam.Mu.Lock(); err == nil {
+			klog.Errorf("====get lock allocate")
 			break
 		} else {
 			time.Sleep(time.Millisecond)
@@ -148,12 +149,16 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	defer ipam.Mu.Unlock()
 	var podIp *ip.IP
 	var opts []clientv3.Op
+	if len(subnet.Reserved) <= 0 {
+		return nil, fmt.Errorf("no address avaliable")
+	}
 	for ipaddr := range subnet.Reserved {
 		delete(subnet.Reserved, ipaddr)
 		subnet.Allocated[ipaddr] = "1"
 		podIp.IP = net.ParseIP(ipaddr)
 		break
 	}
+	klog.Errorf("=====ip is %+v", podIp)
 	networkCrdData := etcd.NetworkCrd{
 		Name:    networkCrd.Name,
 		Subnets: []etcd.Subnet{subnet},
@@ -175,7 +180,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		// rollback
 		return nil, fmt.Errorf("failed to Allocate ip due to etcd commit failed ,err : %s ", err)
 	}
-
+	klog.Errorf("=========crd is %+v", networkCrdData)
 	return podIp, nil
 }
 
@@ -200,7 +205,6 @@ func ones(ip net.IP) net.IP {
 }
 
 func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, err error) {
-
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
