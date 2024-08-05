@@ -11,7 +11,6 @@ import (
 	"github.com/cni/pkg/util/k8s"
 	"github.com/cni/pkg/util/rest"
 	"github.com/containernetworking/cni/pkg/types"
-	types020 "github.com/containernetworking/cni/pkg/types/020"
 	types100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -165,13 +164,13 @@ type Pod struct {
 	NetNs       string          `json:"net_ns"`
 	IfName      string          `json:"if_name"`
 	MTU         int             `json:"mtu"`
-	Result      types020.Result `json:"result"`
+	Result      types100.Result `json:"result"`
 	HostId      string          `json:"binding:host-id"`
 }
 
 type PodResponse struct {
 	Port   Port            `json:"port"`
-	Result types020.Result `json:"result"`
+	Result types100.Result `json:"result"`
 }
 type Port struct {
 }
@@ -286,11 +285,13 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
 	var podResp PodResponse
+	klog.Errorf("==========create pod %+v", pod)
 	network, _, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
 		return 400, podResp, err
 	}
-	result := &types100.Result{
+	klog.Errorf("==========network is %+v", network)
+	result := types100.Result{
 		CNIVersion: pod.Result.CNIVersion,
 	}
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
@@ -299,9 +300,10 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	}
 	podIp, gwIp, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
-		klog.Error(err)
+		klog.Errorf("failed to allocation ip ,err is %v", err)
 		return 0, PodResponse{}, err
 	}
+	klog.Errorf("==========podIP is %+v", podIp)
 	ifmac := GeneratePortRandomMacAddress()
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
@@ -311,6 +313,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		}
 		return 0, PodResponse{}, err
 	}
+	klog.Errorf("==========podNs is %+v", podNs)
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
 	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, gwIp, 1500, podNs)
 	if err != nil {
@@ -320,6 +323,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		}
 		return 0, PodResponse{}, err
 	}
+	klog.Errorf("==========pod hostInterface is %+v ,", hostInterface)
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
 	podIpConfig := &types100.IPConfig{
 		Interface: types100.Int(1),
@@ -327,7 +331,8 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		Gateway:   gwIp.IP,
 	}
 	result.IPs = []*types100.IPConfig{podIpConfig}
-	return 400, podResp, nil
+	podResp.Result = result
+	return 200, podResp, nil
 }
 
 func DeletePod(na *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
@@ -485,7 +490,8 @@ func configureSysctls(hostVethName string, hasIPv4, hasIPv6 bool) error {
 	return nil
 }
 
-func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface, *types100.Interface, error) {
+func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface,
+	*types100.Interface, error) {
 	hostInterface := &types100.Interface{}
 	contInterface := &types100.Interface{}
 	// 创建vethPair，配置容器ip，默认路由，mtu

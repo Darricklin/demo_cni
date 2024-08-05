@@ -8,7 +8,7 @@ import (
 	"github.com/cni/pkg/util/rest"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
-	types020 "github.com/containernetworking/cni/pkg/types/020"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"log"
 	"os"
@@ -91,7 +91,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	logInfof("receive pod creation event: namespace %s,pod %s,ns %s,containerID %s", podNamespace, podName, args.Netns, args.ContainerID)
-	result := types020.Result{
+	result := types100.Result{
 		CNIVersion: n.CNIVersion,
 		DNS:        n.DNS,
 	}
@@ -155,15 +155,15 @@ func cmdDel(args *skel.CmdArgs) error {
 		return logErrorf("required CNI variable missing")
 	}
 	logInfof("receive pod deletion event : namespace %s, pod %s, ifname %s", podNameSpace, podName, podIfName)
-	if err = deletePod(podNameSpace, podName, podIfName); err != nil {
+	if err = deletePod(podNameSpace, podName, podIfName, args.Netns); err != nil {
 		return logErrorf("failed to delete pod : %v", err)
 	}
 	return nil
 }
 
-func deletePod(namespace, name, ifname string) error {
+func deletePod(namespace, name, ifname, netns string) error {
 	client := rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix")
-	url := fmt.Sprintf("%s%s/%s/%s/%s", constants.Base, constants.Ports, namespace, name, ifname)
+	url := fmt.Sprintf("%s%s/%s/%s/%s/%s", constants.Base, constants.Ports, namespace, name, ifname, netns)
 	logInfof("send pod deletion request: pod namespace, pod name, pod ifname", namespace, name, ifname)
 	code, err := client.Request("DELETE", url, nil, nil)
 	if err != nil {
