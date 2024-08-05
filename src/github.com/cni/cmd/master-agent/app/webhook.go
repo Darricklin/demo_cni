@@ -139,7 +139,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				}
 				ipPool := make(map[string]string)
 				for ipaddr := ipNet.IP.Mask(ipNet.Mask); ipNet.Contains(ipaddr); ipam.Inc(ipaddr) {
-					ipPool[ipaddr.String()] = "0"
+					ipPool[ipaddr.String()] = "1"
 				}
 				etcdSub := etcd.Subnet{
 					Name:      subnet.Name,
