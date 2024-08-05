@@ -265,7 +265,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 }
 func ValidateRequest(nm *options.MasterAgent, request *restful.Request, response *restful.Response) {
 	var ar v1beta1.AdmissionReview
-	if err := request.ReadEntity(ar); err != nil {
+	if err := request.ReadEntity(&ar); err != nil {
 		klog.Error(err)
 		writeValidateResponse(response, false, nil, "", err.Error())
 		return
