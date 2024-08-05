@@ -158,9 +158,11 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	for ipaddr := range subnet.Reserved {
 		klog.Errorf("=====ipaddr is %+v", ipaddr)
 		delete(subnet.Reserved, ipaddr)
+		klog.Errorf("=====1111  ipaddr is %+v", ipaddr)
 		subnet.Allocated[ipaddr] = "1"
+		klog.Errorf("=====222222  ipaddr is %+v", ipaddr)
 		podIp.IP = net.ParseIP(ipaddr)
-		klog.Errorf("+++++++podIp is %+v", podIp)
+		klog.Errorf("=====33333 podIp is %+v", podIp)
 		break
 	}
 	klog.Errorf("=====ip is %+v", podIp)
