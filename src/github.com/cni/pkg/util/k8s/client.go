@@ -89,36 +89,36 @@ func (c *Client) GetVersion() (Version, error) {
 	return ver, nil
 }
 
-func (c *Client) GetNodeList(req *restful.Request, resp *restful.Response) {
-	var nodeList, nodeListResp NodeList
-
-	code, err := c.Request("GET", "/api/v1/nodes", nil, &nodeList)
-	if err != nil {
-		klog.Errorf("failed to get k8s nodes ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
-	}
-	klog.Infof("get k8s nodes : %+v , code : %v", nodeList, code)
-	nodeListResp = NodeList{
-		Kind:       nodeList.Kind,
-		APIVersion: nodeList.APIVersion,
-		Items:      []Node{},
-	}
-	for _, node := range nodeList.Items {
-		var conditions []NodeCondition
-		for _, condition := range node.Status.Conditions {
-			if condition.Type == "Ready" {
-				conditions = append(conditions, condition)
-				break
-			}
-		}
-		node.Status.Conditions = conditions
-		nodeListResp.Items = append(nodeListResp.Items, node)
-		klog.Infof("node condition is %+v", node.Status.Conditions)
-	}
-	_ = resp.WriteAsJson(nodeListResp)
-	return
-}
+//func (c *Client) GetNodeList(req *restful.Request, resp *restful.Response) {
+//	var nodeList, nodeListResp NodeList
+//
+//	code, err := c.Request("GET", "/api/v1/nodes", nil, &nodeList)
+//	if err != nil {
+//		klog.Errorf("failed to get k8s nodes ,code %v, error is %v", code, err)
+//		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
+//		return
+//	}
+//	klog.Infof("get k8s nodes : %+v , code : %v", nodeList, code)
+//	nodeListResp = NodeList{
+//		Kind:       nodeList.Kind,
+//		APIVersion: nodeList.APIVersion,
+//		Items:      []Node{},
+//	}
+//	for _, node := range nodeList.Items {
+//		var conditions []NodeCondition
+//		for _, condition := range node.Status.Conditions {
+//			if condition.Type == "Ready" {
+//				conditions = append(conditions, condition)
+//				break
+//			}
+//		}
+//		node.Status.Conditions = conditions
+//		nodeListResp.Items = append(nodeListResp.Items, node)
+//		klog.Infof("node condition is %+v", node.Status.Conditions)
+//	}
+//	_ = resp.WriteAsJson(nodeListResp)
+//	return
+//}
 
 func (c *Client) GetPodAnnoAndLabels(ns, name string) (PodLabels, PodAnnotations, string, error) {
 	podUrl := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", ns, name)
@@ -223,65 +223,65 @@ func (c *Client) UpdatePod(req *restful.Request, resp *restful.Response) {
 	return
 }
 
-func (c *Client) GetEndPointList(req *restful.Request, resp *restful.Response) {
-	var endpointsList EndpointsList
-	code, err := c.Request("GET", "/api/v1/endpoints", nil, &endpointsList)
-	if err != nil {
-		klog.Errorf("failed to get k8s endpoints ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
-	}
-	klog.Infof("get k8s endpoints : %+v , code : %v", endpointsList, code)
-	_ = resp.WriteAsJson(endpointsList)
-	return
-}
-func (c *Client) GetServiceList(req *restful.Request, resp *restful.Response) {
-	serviceRespList := ServiceRespList{}
-	var serviceList ServiceList
-	code, err := c.Request("GET", "/api/v1/services", nil, &serviceList)
-	if err != nil {
-		klog.Errorf("failed to get k8s services ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
-	}
-	klog.Infof("get k8s services : %+v , code : %v", serviceList, code)
-	var endpointsList EndpointsList
-	code, err = c.Request("GET", "/api/v1/endpoints", nil, &endpointsList)
-	if err != nil {
-		klog.Errorf("failed to get k8s endpoints ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
-	}
-	klog.Infof("get k8s endpoints : %+v , code : %v", endpointsList, code)
-	serviceRespList.Kind = serviceList.Kind
-	serviceRespList.ApiVersion = serviceList.ApiVersion
-	for _, service := range serviceList.Items {
-		for _, endpoint := range endpointsList.Items {
-			if service.MetaData.Name == endpoint.MetaData.Name && service.MetaData.NameSpace == endpoint.MetaData.Namespace {
-				respService := RespService{
-					MetaData: service.MetaData,
-					Spec:     service.Spec,
-					Endpoint: endpoint.Subsets,
-				}
-				serviceRespList.Items = append(serviceRespList.Items, respService)
-			}
-		}
-	}
-	_ = resp.WriteAsJson(serviceRespList)
-	return
-}
-func (c *Client) GetNetworkCrdList(req *restful.Request, resp *restful.Response) {
-	var networkCrdList NetworkCrdList
-	code, err := c.Request("GET", "/apis/k8s.cni.cncf.io/v1/network-attachment-definitions", nil, &networkCrdList)
-	if err != nil {
-		klog.Errorf("failed to get k8s networkCrd ,code %v, error is %v", code, err)
-		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
-		return
-	}
-	klog.Infof("get k8s networkCrd : %+v , code : %v", networkCrdList, code)
-	_ = resp.WriteAsJson(networkCrdList)
-	return
-}
+//func (c *Client) GetEndPointList(req *restful.Request, resp *restful.Response) {
+//	var endpointsList EndpointsList
+//	code, err := c.Request("GET", "/api/v1/endpoints", nil, &endpointsList)
+//	if err != nil {
+//		klog.Errorf("failed to get k8s endpoints ,code %v, error is %v", code, err)
+//		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
+//		return
+//	}
+//	klog.Infof("get k8s endpoints : %+v , code : %v", endpointsList, code)
+//	_ = resp.WriteAsJson(endpointsList)
+//	return
+//}
+//func (c *Client) GetServiceList(req *restful.Request, resp *restful.Response) {
+//	serviceRespList := ServiceRespList{}
+//	var serviceList ServiceList
+//	code, err := c.Request("GET", "/api/v1/services", nil, &serviceList)
+//	if err != nil {
+//		klog.Errorf("failed to get k8s services ,code %v, error is %v", code, err)
+//		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
+//		return
+//	}
+//	klog.Infof("get k8s services : %+v , code : %v", serviceList, code)
+//	var endpointsList EndpointsList
+//	code, err = c.Request("GET", "/api/v1/endpoints", nil, &endpointsList)
+//	if err != nil {
+//		klog.Errorf("failed to get k8s endpoints ,code %v, error is %v", code, err)
+//		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
+//		return
+//	}
+//	klog.Infof("get k8s endpoints : %+v , code : %v", endpointsList, code)
+//	serviceRespList.Kind = serviceList.Kind
+//	serviceRespList.ApiVersion = serviceList.ApiVersion
+//	for _, service := range serviceList.Items {
+//		for _, endpoint := range endpointsList.Items {
+//			if service.MetaData.Name == endpoint.MetaData.Name && service.MetaData.NameSpace == endpoint.MetaData.Namespace {
+//				respService := RespService{
+//					MetaData: service.MetaData,
+//					Spec:     service.Spec,
+//					Endpoint: endpoint.Subsets,
+//				}
+//				serviceRespList.Items = append(serviceRespList.Items, respService)
+//			}
+//		}
+//	}
+//	_ = resp.WriteAsJson(serviceRespList)
+//	return
+//}
+//func (c *Client) GetNetworkCrdList(req *restful.Request, resp *restful.Response) {
+//	var networkCrdList NetworkCrdList
+//	code, err := c.Request("GET", "/apis/k8s.cni.cncf.io/v1/network-attachment-definitions", nil, &networkCrdList)
+//	if err != nil {
+//		klog.Errorf("failed to get k8s networkCrd ,code %v, error is %v", code, err)
+//		rest.WriteError(resp, http.StatusInternalServerError, rest.StatusInternalServerError, err.Error())
+//		return
+//	}
+//	klog.Infof("get k8s networkCrd : %+v , code : %v", networkCrdList, code)
+//	_ = resp.WriteAsJson(networkCrdList)
+//	return
+//}
 
 func (c *Client) GetNetworkCrd(name string) (NetworkCrd, error) {
 	var networkCrd NetworkCrd

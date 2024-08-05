@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/cni/cmd/node-agent/app/options"
@@ -120,24 +121,62 @@ func NewIpamDriver(na *options.NodeAgent, networkName string) (*IpamDriver, erro
 	return ipam, nil
 }
 
-func AllocateIP(subnet *net.IPNet, AllocateIPMap map[string]string) (net.IP, error) {
-	// Get the network address and mask length from the subnet.
-	netAddr := subnet.IP.Mask(subnet.Mask)
-
-	// Iterate over the IP addresses within the subnet.
-	for ipAddr := netAddr.Mask(subnet.Mask); subnet.Contains(ipAddr); Inc(ipAddr) {
-		// Skip the network and broadcast addresses.
-		_, ok := AllocateIPMap[ipAddr.String()]
-		if ipAddr.Equal(subnet.IP) || ipAddr.Equal(ones(subnet.IP)) || ok {
-			continue
+func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet) (*ip.IP, error) {
+	//// Get the network address and mask length from the subnet.
+	//netAddr := subnet.IP.Mask(subnet.Mask)
+	//
+	//// Iterate over the IP addresses within the subnet.
+	//for ipAddr := netAddr.Mask(subnet.Mask); subnet.Contains(ipAddr); Inc(ipAddr) {
+	//	// Skip the network and broadcast addresses.
+	//	_, ok := AllocateIPMap[ipAddr.String()]
+	//	if ipAddr.Equal(subnet.IP) || ipAddr.Equal(ones(subnet.IP)) || ok {
+	//		continue
+	//	}
+	//	AllocateIPMap[ipAddr.String()] = "1"
+	//	// Return the currently allocated IP address.
+	//	return ipAddr, nil
+	//}
+	//
+	//// If no valid IP address found, return an error.
+	for i := 0; i < 10; i++ {
+		if err := ipam.Mu.Lock(); err == nil {
+			break
+		} else {
+			time.Sleep(time.Millisecond)
 		}
-		AllocateIPMap[ipAddr.String()] = "1"
-		// Return the currently allocated IP address.
-		return ipAddr, nil
+	}
+	defer ipam.Mu.Unlock()
+	var podIp *ip.IP
+	var opts []clientv3.Op
+	for ipaddr := range subnet.Reserved {
+		delete(subnet.Reserved, ipaddr)
+		subnet.Allocated[ipaddr] = "1"
+		podIp.IP = net.ParseIP(ipaddr)
+		break
+	}
+	networkCrdData := etcd.NetworkCrd{
+		Name:    networkCrd.Name,
+		Subnets: []etcd.Subnet{subnet},
+	}
+	for _, oldSubnet := range networkCrd.Subnets {
+		if oldSubnet.Name != subnet.Name {
+			networkCrdData.Subnets = append(networkCrdData.Subnets, oldSubnet)
+		}
 	}
 
-	// If no valid IP address found, return an error.
-	return nil, fmt.Errorf("no available IP address in the subnet")
+	op, err := etcd.OpPutObject(networkCrd.Name, networkCrd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Allocate ip due to OpPutObject failed ,err : %s ", err)
+	} else {
+		opts = append(opts, op)
+	}
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if _, err = ipam.EtcdClient.Txn(ctx).Then(opts...).Commit(); err != nil {
+		// rollback
+		return nil, fmt.Errorf("failed to Allocate ip due to etcd commit failed ,err : %s ", err)
+	}
+
+	return podIp, nil
 }
 
 // Inc Increment IP address
@@ -160,25 +199,18 @@ func ones(ip net.IP) net.IP {
 	return result
 }
 
-func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, opts []clientv3.Op, err error) {
-	for i := 0; i < 10; i++ {
-		if err = ipam.Mu.Lock(); err == nil {
-			break
-		} else {
-			time.Sleep(time.Millisecond)
-		}
-	}
-	defer ipam.Mu.Unlock()
+func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, err error) {
+
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
 		errMsg := fmt.Sprintf("failed to get network %v from etcd ", network)
-		return nil, nil, opts, errors.New(errMsg)
+		return nil, nil, errors.New(errMsg)
 	}
 	if len(networkCrd.Subnets) == 0 {
 		klog.Errorf("network %v don't have subnet ", network)
 		errMsg := fmt.Sprintf("network %v don't have subnet ", network)
-		return nil, nil, opts, errors.New(errMsg)
+		return nil, nil, errors.New(errMsg)
 	}
 	for _, subnet := range networkCrd.Subnets {
 		_, ipNet, err := net.ParseCIDR(subnet.CIDR)
@@ -186,14 +218,12 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 			klog.Errorf("failed to parse subnet %v cidr of network %v")
 			continue
 		}
-		newIP, err := AllocateIP(ipNet, subnet.AllocatedIps)
+		ipaddr, err = AllocateIP(ipam, networkCrd, subnet)
 		if err != nil {
 			klog.Errorf("failed to AllocateIP ,err is %v", err)
 			continue
 		}
 		ipaddr.IPNet = *ipNet
-		ipaddr.IP = newIP
-		subnet.AllocatedIps[newIP.String()] = "1"
 		gw.IPNet = *ipNet
 		gw.IP = net.ParseIP(subnet.Gateway)
 		break
@@ -201,36 +231,22 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 	if ipaddr == nil || gw == nil {
 		klog.Errorf("failed AllocateIP for pod from network %v", network)
 		errMsg := fmt.Sprintf("failed AllocateIP for pod from network %v", network)
-		return ipaddr, gw, opts, errors.New(errMsg)
+		return ipaddr, gw, errors.New(errMsg)
 	}
-	op, err := etcd.OpPutObject(network, networkCrd)
-	if err != nil {
-		return nil, nil, nil, err
-	} else {
-		opts = append(opts, op)
-	}
-	return ipaddr, gw, opts, nil
+	return ipaddr, gw, nil
 }
 
-func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) (opts []clientv3.Op, err error) {
-	for i := 0; i < 10; i++ {
-		if err = ipam.Mu.Lock(); err == nil {
-			break
-		} else {
-			time.Sleep(time.Millisecond)
-		}
-	}
-	defer ipam.Mu.Unlock()
+func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) error {
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
 		errMsg := fmt.Sprintf("failed to get network %v from etcd ", network)
-		return opts, errors.New(errMsg)
+		return errors.New(errMsg)
 	}
 	if len(networkCrd.Subnets) == 0 {
 		klog.Errorf("network %v don't have subnet ", network)
 		errMsg := fmt.Sprintf("network %v don't have subnet ", network)
-		return opts, errors.New(errMsg)
+		return errors.New(errMsg)
 	}
 	for _, subnet := range networkCrd.Subnets {
 		_, ipNet, err := net.ParseCIDR(subnet.CIDR)
@@ -240,13 +256,46 @@ func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) (opts []
 		}
 		ipaddr := net.ParseIP(ip)
 		if ipNet.Contains(ipaddr) {
-			delete(subnet.AllocatedIps, ip)
+			if err = ReleaseIp(ipam, networkCrd, subnet, ip); err != nil {
+				return fmt.Errorf("failed to release ip ,err is %v", err)
+			}
 			break
 		}
 	}
-	op, err := etcd.OpPutObject(network, networkCrd)
+	return nil
+}
+
+func ReleaseIp(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet, ipAddr string) error {
+	for i := 0; i < 10; i++ {
+		if err := ipam.Mu.Lock(); err == nil {
+			break
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	defer ipam.Mu.Unlock()
+	var opts []clientv3.Op
+	delete(subnet.Allocated, ipAddr)
+	subnet.Reserved[ipAddr] = "1"
+	networkCrdData := etcd.NetworkCrd{
+		Name:    networkCrd.Name,
+		Subnets: []etcd.Subnet{subnet},
+	}
+	for _, subnetOld := range networkCrd.Subnets {
+		if subnetOld.Name != subnet.Name {
+			networkCrdData.Subnets = append(networkCrdData.Subnets, subnetOld)
+		}
+	}
+	op, err := etcd.OpPutObject(networkCrd.Name, networkCrd)
 	if err != nil {
+		return fmt.Errorf("failed to Allocate ip due to OpPutObject failed ,err : %s ", err)
+	} else {
 		opts = append(opts, op)
 	}
-	return opts, nil
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if _, err = ipam.EtcdClient.Txn(ctx).Then(opts...).Commit(); err != nil {
+		// rollback
+		return fmt.Errorf("failed to Allocate ip due to etcd commit failed ,err : %s ", err)
+	}
+	return nil
 }

@@ -61,13 +61,13 @@ type ErrorResp struct {
 	Error ErrorRespBody `json:"error"`
 }
 type ErrorRespBody struct {
-	Code    string `json:"code"`
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-func WriteError(resp *restful.Response, statusCode int, ErrCode, message string) {
+func WriteError(resp *restful.Response, statusCode int, message string) {
 	errorRespBody := ErrorRespBody{
-		Code:    ErrCode,
+		Code:    statusCode,
 		Message: message,
 	}
 	if err := resp.WriteHeaderAndJson(statusCode, errorRespBody, restful.MIME_JSON); err != nil {

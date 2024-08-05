@@ -12,11 +12,12 @@ type NetworkCrd struct {
 }
 
 type Subnet struct {
-	Name         string            `json:"name"`
-	CIDR         string            `json:"cidr"`
-	AllocatedIps map[string]string `json:"allocated_ips"`
-	IpVersion    int               `json:"ip_version"`
-	Gateway      string            `json:"gateway"`
+	Name      string            `json:"name"`
+	CIDR      string            `json:"cidr"`
+	Allocated map[string]string `json:"allocated"`
+	Reserved  map[string]string `json:"reserved"`
+	IpVersion int               `json:"ip_version"`
+	Gateway   string            `json:"gateway"`
 }
 
 type AllocatedIp struct {

@@ -142,11 +142,12 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 					ipPool[ipaddr.String()] = "0"
 				}
 				etcdSub := etcd.Subnet{
-					Name:         subnet.Name,
-					CIDR:         subnet.Cidr,
-					AllocatedIps: ipPool,
-					IpVersion:    subnet.IPVersion,
-					Gateway:      subnet.GatewayIP,
+					Name:      subnet.Name,
+					CIDR:      subnet.Cidr,
+					Allocated: ipPool,
+					Reserved:  make(map[string]string),
+					IpVersion: subnet.IPVersion,
+					Gateway:   subnet.GatewayIP,
 				}
 				networkCrdETCDData.Subnets = append(networkCrdETCDData.Subnets, etcdSub)
 			}
@@ -209,11 +210,12 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 					ipPool[ipaddr.String()] = "0"
 				}
 				etcdSub := etcd.Subnet{
-					Name:         subnet.Name,
-					CIDR:         subnet.Cidr,
-					AllocatedIps: ipPool,
-					IpVersion:    subnet.IPVersion,
-					Gateway:      subnet.GatewayIP,
+					Name:      subnet.Name,
+					CIDR:      subnet.Cidr,
+					Allocated: ipPool,
+					Reserved:  make(map[string]string),
+					IpVersion: subnet.IPVersion,
+					Gateway:   subnet.GatewayIP,
 				}
 				networkCrdETCDData.Subnets = append(networkCrdETCDData.Subnets, etcdSub)
 			}

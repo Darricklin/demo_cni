@@ -17,7 +17,6 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/emicklei/go-restful/v3"
 	"github.com/vishvananda/netlink"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"io"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -237,12 +236,14 @@ func ProcessCreatePod(na *options.NodeAgent, request *restful.Request, response 
 	var pod Pod
 	if err := request.ReadEntity(&pod); err != nil {
 		klog.Error(err)
+		rest.WriteError(response, http.StatusInternalServerError, err.Error())
 		return
 	}
 	klog.Infof("create pod request received: body is %+v", pod)
 	code, resp, err := createPodFunc(na, pod)
 	if err != nil {
 		klog.Error(err, code)
+		rest.WriteError(response, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if err = response.WriteEntity(resp); err != nil {
@@ -284,7 +285,6 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
 	var podResp PodResponse
-	var opts []clientv3.Op
 	network, _, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
 		return 400, podResp, err
@@ -296,22 +296,27 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	if err != nil {
 		return 0, podResp, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
-	podIp, gwIp, ipOps, err := ipamDriver.AllocationIpFromNetwork(network)
+	podIp, gwIp, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Error(err)
 		return 0, PodResponse{}, err
 	}
-	opts = append(opts, ipOps...)
 	ifmac := GeneratePortRandomMacAddress()
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
-		klog.Error(err)
+		klog.Errorf("failed to create pod ,err is %s", err)
+		if releaseIpErr := ipamDriver.ReleaseIpFromNetwork(network, podIp.String()); releaseIpErr != nil {
+			klog.Errorf("failed to releaseIp when CreatePod failed rollback ,err is %s", releaseIpErr)
+		}
 		return 0, PodResponse{}, err
 	}
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
 	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, gwIp, 1500, podNs)
 	if err != nil {
-		klog.Error(err)
+		klog.Errorf("failed to create pod ,err is %s", err)
+		if releaseIpErr := ipamDriver.ReleaseIpFromNetwork(network, podIp.String()); releaseIpErr != nil {
+			klog.Errorf("failed to releaseIp when CreatePod failed rollback ,err is %s", releaseIpErr)
+		}
 		return 0, PodResponse{}, err
 	}
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
@@ -321,15 +326,6 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		Gateway:   gwIp.IP,
 	}
 	result.IPs = []*types100.IPConfig{podIpConfig}
-	etcdCli, err := etcd.NewClient(etcd.NewEtcdFlags())
-	if err != nil {
-		return 400, podResp, err
-	}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	if _, err := etcdCli.Txn(ctx).Then(opts...).Commit(); err != nil {
-		// rollback
-		return 400, podResp, err
-	}
 	return 400, podResp, nil
 }
 
@@ -354,7 +350,7 @@ func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response 
 func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (int, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
-	var opts []clientv3.Op
+
 	network, podIp, err := GetNetconf(na, namespace, name)
 	if err != nil {
 		return 0, err
@@ -363,7 +359,7 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (i
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
-	networkOps, err := ipamDriver.ReleaseIpFromNetwork(network, podIp)
+	err = ipamDriver.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
 		return 0, err
 	}
@@ -372,11 +368,7 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname string) (i
 		klog.Errorf("failed to get ns of pod %s %s", namespace, name)
 		return 0, err
 	}
-	opts = append(opts, networkOps...)
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	if _, err = na.EtcdAgent.Client.Txn(ctx).Then(opts...).Commit(); err != nil {
-		return 0, err
-	}
+
 	startTime := time.Now()
 	done := make(chan struct{})
 	var nsErr, linkErr error
