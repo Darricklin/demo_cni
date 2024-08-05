@@ -144,8 +144,8 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				etcdSub := etcd.Subnet{
 					Name:      subnet.Name,
 					CIDR:      subnet.Cidr,
-					Allocated: ipPool,
-					Reserved:  make(map[string]string),
+					Reserved:  ipPool,
+					Allocated:  make(map[string]string),
 					IpVersion: subnet.IPVersion,
 					Gateway:   subnet.GatewayIP,
 				}
