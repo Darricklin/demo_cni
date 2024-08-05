@@ -211,7 +211,7 @@ type NetworkCrdSpec struct {
 
 type Subnet struct {
 	Cidr       string `json:"cidr"`
-	EnableDHCP string `json:"enable_dhcp"`
+	EnableDHCP bool   `json:"enable_dhcp"`
 	GatewayIP  string `json:"gateway_ip"`
 	IPVersion  string `json:"ip_version"`
 	Name       string `json:"name"`
