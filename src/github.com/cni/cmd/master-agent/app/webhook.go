@@ -217,6 +217,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 					IpVersion: subnet.IPVersion,
 					Gateway:   subnet.GatewayIP,
 				}
+				
 				networkCrdETCDData.Subnets = append(networkCrdETCDData.Subnets, etcdSub)
 			}
 			op, err := etcd.OpPutNetwork(network.Name, networkCrdETCDData)
