@@ -9,7 +9,7 @@ import (
 	"github.com/cni/pkg/util/k8s"
 	"github.com/containernetworking/plugins/pkg/ip"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	"net"
 	"time"
 )

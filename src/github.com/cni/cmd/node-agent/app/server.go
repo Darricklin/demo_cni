@@ -19,7 +19,7 @@ import (
 	"io"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	"net"
 	"net/http"
 	"os"

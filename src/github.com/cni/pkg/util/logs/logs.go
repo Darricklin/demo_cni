@@ -2,7 +2,7 @@ package logs
 
 import (
 	"flag"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 )
 
 //type KlogWriter struct {
@@ -16,8 +16,8 @@ import (
 func InitLogs() error {
 	//klog.SetOutput(KlogWriter{})
 	klog.InitFlags(nil)
-	flag.Set("logtostderr", "false")
-	return nil
+	err := flag.Set("logtostderr", "false")
+	return err
 }
 
 func FlushLogs() {

@@ -10,7 +10,7 @@ import (
 	"github.com/cni/pkg/util/flags"
 	"github.com/cni/pkg/util/server"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	"net"
 	"os"
 )

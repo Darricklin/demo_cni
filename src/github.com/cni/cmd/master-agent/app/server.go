@@ -10,7 +10,7 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	clientSet "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	"net"
 	"net/http"
 	"time"
