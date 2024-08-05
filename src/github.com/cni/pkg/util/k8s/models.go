@@ -213,7 +213,7 @@ type Subnet struct {
 	Cidr       string `json:"cidr"`
 	EnableDHCP bool   `json:"enable_dhcp"`
 	GatewayIP  string `json:"gateway_ip"`
-	IPVersion  string `json:"ip_version"`
+	IPVersion  int    `json:"ip_version"`
 	Name       string `json:"name"`
 	SubnetID   string `json:"subnet_id"`
 }
