@@ -15,7 +15,7 @@ type Subnet struct {
 	Name         string            `json:"name"`
 	CIDR         string            `json:"cidr"`
 	AllocatedIps map[string]string `json:"allocated_ips"`
-	IpVersion    string            `json:"ip_version"`
+	IpVersion    int               `json:"ip_version"`
 	Gateway      string            `json:"gateway"`
 }
 
