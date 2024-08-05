@@ -123,7 +123,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 	switch request.Operation {
 	case v1beta1.Create:
 		if _, err := nm.K8sAgent.GetNetworkCrd(network.Name); err == nil {
-			return fmt.Errorf("exists")
+			return fmt.Errorf("network crd is exist")
 		} else {
 			var ops []clientv3.Op
 			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -164,12 +164,6 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 		}
 		return nil
 	case v1beta1.Update:
-		if len(request.Object.Raw) > 0 {
-			if err := json.Unmarshal(request.Object.Raw, &network); err != nil {
-				klog.Errorf("cannot unmarshal raw object ")
-				return err
-			}
-		}
 		networkOld, err := nm.K8sAgent.GetNetworkCrd(network.Name)
 		if err != nil {
 			return err
@@ -232,12 +226,6 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 			return nil
 		}
 	case v1beta1.Delete:
-		if len(request.Object.Raw) > 0 {
-			if err := json.Unmarshal(request.Object.Raw, &network); err != nil {
-				klog.Errorf("cannot unmarshal raw object ")
-				return err
-			}
-		}
 		allPodList, err := nm.K8sAgent.GetPodList()
 		if err != nil {
 			return err
