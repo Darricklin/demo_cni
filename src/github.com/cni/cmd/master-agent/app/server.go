@@ -8,7 +8,7 @@ import (
 	"github.com/cni/pkg/util/etcd"
 	"github.com/cni/pkg/util/k8s"
 	"github.com/emicklei/go-restful/v3"
-	clientset "k8s.io/client-go/kubernetes"
+	clientSet "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"net"
@@ -71,11 +71,11 @@ func initK8s(nm *options.MasterAgent) error {
 	nm.K8sAgent = k8sAgent
 	klog.Infof("init k8s agent succeed")
 	klog.Infof("init k8s clientSet")
-	k8sconfig, err := clientcmd.BuildConfigFromFlags("", "")
+	k8sConfig, err := clientcmd.BuildConfigFromFlags("", "")
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet config: %s", err)
 	}
-	k8sClientSet, err := clientset.NewForConfig(k8sconfig)
+	k8sClientSet, err := clientSet.NewForConfig(k8sConfig)
 	if err != nil {
 		return fmt.Errorf("failed to build k8s clientSet : %s", err)
 	}
@@ -86,8 +86,8 @@ func initK8s(nm *options.MasterAgent) error {
 
 func initServer(nm *options.MasterAgent) error {
 	klog.Info("init server ")
-	wscontainer := restful.NewContainer()
-	wscontainer.Router(restful.CurlyRouter{})
+	wsContainer := restful.NewContainer()
+	wsContainer.Router(restful.CurlyRouter{})
 	ws := new(restful.WebService)
 	ws.Path(constants.Base).Consumes(restful.MIME_JSON).Produces(restful.MIME_JSON)
 	ws.Route(ws.GET(constants.Health).To(GetHealth(nm)).
@@ -98,7 +98,7 @@ func initServer(nm *options.MasterAgent) error {
 		Doc("get server health").
 		Writes(VersionResp{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), VersionResp{}))
-	wscontainer.Add(ws)
+	wsContainer.Add(ws)
 	addr := fmt.Sprintf("%s:%s", nm.BindHost, nm.BindPort)
 	listenerAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -109,7 +109,7 @@ func initServer(nm *options.MasterAgent) error {
 		return fmt.Errorf("failed to create listener %s : %v", listenerAddr, err)
 	}
 	nm.StopWg.Add(1)
-	go startServer(nm, &http.Server{Handler: wscontainer}, listener)
+	go startServer(nm, &http.Server{Handler: wsContainer}, listener)
 	klog.Info("start server succeed")
 	return nil
 }
@@ -145,7 +145,7 @@ func startServer(nm *options.MasterAgent, server *http.Server, listener net.List
 		break
 	}
 }
-func GetHealth(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func GetHealth(_ *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		health := HealthResp{Health: "ok"}
 		if err := response.WriteEntity(health); err != nil {
@@ -153,7 +153,7 @@ func GetHealth(nm *options.MasterAgent) func(request *restful.Request, response 
 		}
 	}
 }
-func GetVersion(nm *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
+func GetVersion(_ *options.MasterAgent) func(request *restful.Request, response *restful.Response) {
 	return func(request *restful.Request, response *restful.Response) {
 		version := VersionResp{
 			Version: "v1.0",

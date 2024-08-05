@@ -86,27 +86,27 @@ func startTLSServer(nm *options.MasterAgent, server *http.Server, listener net.L
 	}
 }
 func writeValidateResponse(response *restful.Response, isAllowed bool, ar *v1beta1.AdmissionReview, patch string, errorMessage string) {
-	adminssionResponse := &v1beta1.AdmissionResponse{}
-	adminssionResponse.Allowed = isAllowed
+	admissionResponse := &v1beta1.AdmissionResponse{}
+	admissionResponse.Allowed = isAllowed
 	if !isAllowed && errorMessage != "" {
-		adminssionResponse.Result = &v1.Status{
+		admissionResponse.Result = &v1.Status{
 			Message: errorMessage,
 		}
 	}
 	if ar != nil && ar.Request != nil {
-		adminssionResponse.UID = ar.Request.UID
+		admissionResponse.UID = ar.Request.UID
 	}
 	if patch != "" {
-		adminssionResponse.Patch = []byte(patch)
+		admissionResponse.Patch = []byte(patch)
 		pt := v1beta1.PatchTypeJSONPatch
-		adminssionResponse.PatchType = &pt
+		admissionResponse.PatchType = &pt
 	}
-	adminssionReview := v1beta1.AdmissionReview{Response: adminssionResponse}
+	admissionReview := v1beta1.AdmissionReview{Response: admissionResponse}
 	if ar != nil && ar.APIVersion != "" && ar.Kind != "" {
-		adminssionReview.Kind = ar.Kind
-		adminssionReview.APIVersion = ar.APIVersion
+		admissionReview.Kind = ar.Kind
+		admissionReview.APIVersion = ar.APIVersion
 	}
-	if err := response.WriteEntity(adminssionReview); err != nil {
+	if err := response.WriteEntity(admissionReview); err != nil {
 		klog.Error(err)
 	}
 }
@@ -137,14 +137,14 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				if err != nil {
 					return err
 				}
-				ippool := make(map[string]string)
+				ipPool := make(map[string]string)
 				for ipaddr := ipNet.IP.Mask(ipNet.Mask); ipNet.Contains(ipaddr); ipam.Inc(ipaddr) {
-					ippool[ipaddr.String()] = "0"
+					ipPool[ipaddr.String()] = "0"
 				}
 				etcdSub := etcd.Subnet{
 					Name:         subnet.Name,
 					CIDR:         subnet.Cidr,
-					AllocatedIps: ippool,
+					AllocatedIps: ipPool,
 					IpVersion:    subnet.IPVersion,
 					Gateway:      subnet.GatewayIP,
 				}
@@ -169,12 +169,12 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				return err
 			}
 		}
-		networkold, err := nm.K8sAgent.GetNetworkCrd(network.Name)
+		networkOld, err := nm.K8sAgent.GetNetworkCrd(network.Name)
 		if err != nil {
 			return err
 		}
 
-		if network.Name != networkold.Name {
+		if network.Name != networkOld.Name {
 			return fmt.Errorf("name cannot change")
 		}
 		allPodList, err := nm.K8sAgent.GetPodList()
@@ -191,7 +191,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				}
 			}
 		}
-		if !reflect.DeepEqual(network.Spec.SubNets, networkold.Spec.SubNets) {
+		if !reflect.DeepEqual(network.Spec.SubNets, networkOld.Spec.SubNets) {
 			var ops []clientv3.Op
 			ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 			txn := nm.EtcdAgent.Client.Txn(ctx)
@@ -204,14 +204,14 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 				if err != nil {
 					return err
 				}
-				ippool := make(map[string]string)
+				ipPool := make(map[string]string)
 				for ipaddr := ipNet.IP.Mask(ipNet.Mask); ipNet.Contains(ipaddr); ipam.Inc(ipaddr) {
-					ippool[ipaddr.String()] = "0"
+					ipPool[ipaddr.String()] = "0"
 				}
 				etcdSub := etcd.Subnet{
 					Name:         subnet.Name,
 					CIDR:         subnet.Cidr,
-					AllocatedIps: ippool,
+					AllocatedIps: ipPool,
 					IpVersion:    subnet.IPVersion,
 					Gateway:      subnet.GatewayIP,
 				}
