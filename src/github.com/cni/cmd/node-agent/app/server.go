@@ -299,17 +299,20 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	podIp, gwIp, ipOps, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Error(err)
+		return 0, PodResponse{}, err
 	}
 	opts = append(opts, ipOps...)
 	ifmac := GeneratePortRandomMacAddress()
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
 		klog.Error(err)
+		return 0, PodResponse{}, err
 	}
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
 	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, gwIp, 1500, podNs)
 	if err != nil {
 		klog.Error(err)
+		return 0, PodResponse{}, err
 	}
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
 	podIpConfig := &types100.IPConfig{
@@ -340,8 +343,8 @@ func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response 
 	deletePodFunc func(*options.NodeAgent, string, string, string) (int, error)) {
 	namespace := request.PathParameter(constants.PodNameSpace)
 	name := request.PathParameter(constants.PodName)
-	containerId := request.PathParameter(constants.ContainerId)
-	code, err := deletePodFunc(na, namespace, name, containerId)
+	ifname := request.PathParameter(constants.IFName)
+	code, err := deletePodFunc(na, namespace, name, ifname)
 	if err != nil {
 		klog.Error(err)
 	}

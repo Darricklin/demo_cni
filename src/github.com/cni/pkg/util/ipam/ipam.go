@@ -169,8 +169,7 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 		}
 	}
 	defer ipam.Mu.Unlock()
-	networkKey := etcd.NetworkKey(network)
-	networkCrd, err := ipam.EtcdClient.GetNetwork(networkKey)
+	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
 		errMsg := fmt.Sprintf("failed to get network %v from etcd ", network)
