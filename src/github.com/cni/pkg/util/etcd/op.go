@@ -39,6 +39,6 @@ func OpPutNetwork(name string, network NetworkCrd) (clientv3.Op, error) {
 }
 
 func OpDeleteNetwork(name string) clientv3.Op {
-	key := NodeKey(name)
+	key := NetworkKey(name)
 	return OpDelete(key)
 }
