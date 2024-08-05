@@ -154,7 +154,9 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	if len(subnet.Reserved) <= 0 {
 		return nil, fmt.Errorf("========no address avaliable")
 	}
+	klog.Errorf("=======subnet is %+v", subnet)
 	for ipaddr := range subnet.Reserved {
+		klog.Errorf("=====ipaddr is %+v", ipaddr)
 		delete(subnet.Reserved, ipaddr)
 		subnet.Allocated[ipaddr] = "1"
 		podIp.IP = net.ParseIP(ipaddr)
