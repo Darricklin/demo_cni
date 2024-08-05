@@ -143,14 +143,16 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 			klog.Errorf("====get lock allocate")
 			break
 		} else {
+			klog.Errorf("==========get lock failed , err is %v", err)
 			time.Sleep(time.Millisecond)
 		}
 	}
 	defer ipam.Mu.Unlock()
+	klog.Errorf("=========start allocate ip ")
 	var podIp *ip.IP
 	var opts []clientv3.Op
 	if len(subnet.Reserved) <= 0 {
-		return nil, fmt.Errorf("no address avaliable")
+		return nil, fmt.Errorf("========no address avaliable")
 	}
 	for ipaddr := range subnet.Reserved {
 		delete(subnet.Reserved, ipaddr)

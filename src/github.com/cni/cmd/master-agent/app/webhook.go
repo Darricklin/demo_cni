@@ -145,7 +145,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 					Name:      subnet.Name,
 					CIDR:      subnet.Cidr,
 					Reserved:  ipPool,
-					Allocated:  make(map[string]string),
+					Allocated: make(map[string]string),
 					IpVersion: subnet.IPVersion,
 					Gateway:   subnet.GatewayIP,
 				}
@@ -226,6 +226,7 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 			return nil
 		}
 	case v1beta1.Delete:
+		klog.Errorf("======delete crd %v", network.Name)
 		allPodList, err := nm.K8sAgent.GetPodList()
 		if err != nil {
 			return err

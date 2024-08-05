@@ -40,5 +40,6 @@ func OpPutNetwork(name string, network NetworkCrd) (clientv3.Op, error) {
 
 func OpDeleteNetwork(name string) clientv3.Op {
 	key := NetworkKey(name)
+	klog.Errorf("==========network key is %v", key)
 	return OpDelete(key)
 }
