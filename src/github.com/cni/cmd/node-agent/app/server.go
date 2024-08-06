@@ -187,7 +187,7 @@ func startServer(na *options.NodeAgent, server *http.Server, listener net.Listen
 	stopCh := make(chan struct{})
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			klog.Error("failed to start server,err is %s", err)
+			klog.Errorf("failed to start server,err is %s", err)
 			close(stopCh)
 		}
 	}()

@@ -1,12 +1,11 @@
-package app
+package main
 
 import (
 	"fmt"
 	"github.com/vishvananda/netlink"
-	"testing"
 )
 
-func TestSetupVethPair(t *testing.T) {
+func main() {
 	ens192, err := netlink.LinkByName("ens192")
 	if err != nil {
 		fmt.Printf("failed get netlinkens192,err is %s", err)
