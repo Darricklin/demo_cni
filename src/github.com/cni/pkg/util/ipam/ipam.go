@@ -149,7 +149,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	}
 	defer ipam.Mu.Unlock()
 	klog.Errorf("=========start allocate ip ")
-	var podIp *ip.IP
+	var podIp ip.IP
 	var opts []clientv3.Op
 	if len(subnet.Reserved) <= 0 {
 		return nil, fmt.Errorf("========no address avaliable")
@@ -188,7 +188,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		return nil, fmt.Errorf("failed to Allocate ip due to etcd commit failed ,err : %s ", err)
 	}
 	klog.Errorf("=========crd is %+v", networkCrdData)
-	return podIp, nil
+	return &podIp, nil
 }
 
 // Inc Increment IP address
@@ -211,7 +211,7 @@ func ones(ip net.IP) net.IP {
 	return result
 }
 
-func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.IP, err error) {
+func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *ip.IP, err error) {
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
@@ -223,28 +223,32 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (ipaddr, gw *ip.
 		errMsg := fmt.Sprintf("network %v don't have subnet ", network)
 		return nil, nil, errors.New(errMsg)
 	}
+	var gw ip.IP
 	for _, subnet := range networkCrd.Subnets {
 		_, ipNet, err := net.ParseCIDR(subnet.CIDR)
 		if err != nil {
-			klog.Errorf("failed to parse subnet %v cidr of network %v")
+			klog.Errorf("failed to parse subnet %v cidr of network %v", subnet, networkCrd.Name)
 			continue
 		}
-		ipaddr, err = AllocateIP(ipam, networkCrd, subnet)
+		ipAddr, err := AllocateIP(ipam, networkCrd, subnet)
 		if err != nil {
 			klog.Errorf("failed to AllocateIP ,err is %v", err)
 			continue
 		}
-		ipaddr.IPNet = *ipNet
-		gw.IPNet = *ipNet
+		podIp = ipAddr
+		podIp.Mask = ipNet.Mask
 		gw.IP = net.ParseIP(subnet.Gateway)
+		gw.Mask = ipNet.Mask
+		podGw = &gw
 		break
 	}
-	if ipaddr == nil || gw == nil {
+
+	if podIp == nil || podGw == nil {
 		klog.Errorf("failed AllocateIP for pod from network %v", network)
 		errMsg := fmt.Sprintf("failed AllocateIP for pod from network %v", network)
-		return ipaddr, gw, errors.New(errMsg)
+		return podIp, podGw, errors.New(errMsg)
 	}
-	return ipaddr, gw, nil
+	return podIp, podGw, nil
 }
 
 func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) error {
@@ -262,7 +266,7 @@ func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) error {
 	for _, subnet := range networkCrd.Subnets {
 		_, ipNet, err := net.ParseCIDR(subnet.CIDR)
 		if err != nil {
-			klog.Errorf("failed to parse subnet %v cidr of network %v")
+			klog.Errorf("failed to parse subnet %v cidr of network %v", subnet, networkCrd.Name)
 			continue
 		}
 		ipaddr := net.ParseIP(ip)
