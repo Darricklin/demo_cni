@@ -237,7 +237,7 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *i
 		}
 		podIp = ipAddr
 		podIp.Mask = ipNet.Mask
-		gw.IP = net.ParseIP(subnet.Gateway)
+		gw.IP = nil
 		gw.Mask = ipNet.Mask
 		podGw = &gw
 		break
