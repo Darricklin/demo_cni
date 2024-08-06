@@ -498,6 +498,7 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 	err := netNs.Do(func(hostNs ns.NetNS) error {
 		_, containerVeth, err := ip.SetupVethWithName(ifName, hostVethName, mtu, podMac, hostNs)
 		if err != nil {
+			klog.Errorf("=======failed setup veth ,err is %v", err)
 			return err
 		}
 		contInterface.Name = containerVeth.Name
@@ -505,11 +506,13 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 		contInterface.Sandbox = netNs.Path()
 		contLink, err := netlink.LinkByName(containerVeth.Name)
 		if err != nil {
+			klog.Errorf("=======failed get contLink ,err is %v", err)
 			return err
 		}
 
 		err = netlink.AddrAdd(contLink, &netlink.Addr{IPNet: &podIp.IPNet})
 		if err != nil {
+			klog.Errorf("=======failed AddrAdd ,err is %v", err)
 			return err
 		}
 		defaultNet := net.IPNet{}
@@ -524,30 +527,37 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 		defaultRoute := &types.Route{Dst: defaultNet, GW: podGw.IP}
 		err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, contLink)
 		if err != nil {
+			klog.Errorf("=======failed AddRoute ,err is %v", err)
 			return err
 		}
 		if err := netlink.LinkSetMTU(contLink, mtu); err != nil {
+			klog.Errorf("=======failed LinkSetMTU ,err is %v", err)
 			return err
 		}
 		return nil
 	})
 	if err != nil {
+		klog.Errorf("=========failed netNs.Do ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 
 	// 配置默认的mac，mtu，路由
 	hostLink, err := netlink.LinkByName(hostVethName)
 	if err != nil {
+		klog.Errorf("=======failed LinkByName ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	hardwareAddr, err := net.ParseMAC(constants.HostVethMac)
 	if err != nil {
+		klog.Errorf("=======failed ParseMAC ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	if err := netlink.LinkSetHardwareAddr(hostLink, hardwareAddr); err != nil {
+		klog.Errorf("=======failed LinkSetHardwareAddr ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	if err := netlink.LinkSetMTU(hostLink, mtu); err != nil {
+		klog.Errorf("=======failed LinkSetMTU ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	hostInterface.Name = hostVethName
@@ -567,10 +577,12 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 	defaultRoute := &types.Route{Dst: podIPNet, GW: podGw.IP}
 	err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, hostLink)
 	if err != nil {
+		klog.Errorf("=======failed AddRoute ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	err = configureSysctls(hostVethName, hasIpv4, hasIpv6)
 	if err != nil {
+		klog.Errorf("=======failed configureSysctls ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	return hostInterface, contInterface, err
