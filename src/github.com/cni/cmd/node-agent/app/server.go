@@ -510,6 +510,9 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 			return err
 		}
 		klog.Errorf("=========contLink is %+v", contLink)
+		if err = netlink.LinkSetUp(contLink); err != nil {
+			klog.Errorf("========failed to setup contLink,err is %s", err)
+		}
 		err = netlink.AddrAdd(contLink, &netlink.Addr{IPNet: &podIp.IPNet})
 		if err != nil {
 			klog.Errorf("=======failed AddrAdd ,err is %v", err)
@@ -520,6 +523,7 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 			klog.Errorf("========failed to get contLink ip,err is %v", err)
 		}
 		klog.Errorf("======contLink ip is %+v", ipaddrs)
+
 		defaultNet := net.IPNet{}
 		if podIp.IP.To4() != nil {
 			defaultNet.IP = net.IPv4zero
