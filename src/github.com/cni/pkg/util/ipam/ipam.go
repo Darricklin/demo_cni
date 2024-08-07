@@ -231,7 +231,7 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *n
 		break
 	}
 
-	if podIp == nil || podGw == nil {
+	if podIp == nil {
 		klog.Errorf("failed AllocateIP for pod from network %v", network)
 		errMsg := fmt.Sprintf("failed AllocateIP for pod from network %v", network)
 		return podIp, podGw, errors.New(errMsg)
