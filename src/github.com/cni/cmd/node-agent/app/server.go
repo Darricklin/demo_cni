@@ -10,7 +10,6 @@ import (
 	"github.com/cni/pkg/util/ipam"
 	"github.com/cni/pkg/util/k8s"
 	"github.com/cni/pkg/util/rest"
-	"github.com/containernetworking/cni/pkg/types"
 	types100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -315,7 +314,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	}
 	klog.Errorf("==========podNs is %+v", podNs)
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
-	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, gwIp, 1500, podNs)
+	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, 1500, podNs)
 	if err != nil {
 		klog.Errorf("failed to create pod ,err is %s", err)
 		if releaseIpErr := ipamDriver.ReleaseIpFromNetwork(network, podIp.String()); releaseIpErr != nil {
@@ -490,90 +489,10 @@ func configureSysctls(hostVethName string, hasIPv4, hasIPv6 bool) error {
 	return nil
 }
 
-func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface,
+func SetupVethPair(ifName, podMac, hostVethName string, podIp *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface,
 	*types100.Interface, error) {
 	hostInterface := &types100.Interface{}
 	contInterface := &types100.Interface{}
-	// 创建vethPair，配置容器ip，默认路由，mtu
-	err := netNs.Do(func(hostNs ns.NetNS) error {
-		_, containerVeth, err := ip.SetupVethWithName(ifName, hostVethName, mtu, podMac, hostNs)
-		if err != nil {
-			klog.Errorf("=======failed setup veth ,err is %v", err)
-			return err
-		}
-		contInterface.Name = containerVeth.Name
-		contInterface.Mac = containerVeth.HardwareAddr.String()
-		contInterface.Sandbox = netNs.Path()
-		contLink, err := netlink.LinkByName(containerVeth.Name)
-		if err != nil {
-			klog.Errorf("=======failed get contLink ,err is %v", err)
-			return err
-		}
-		klog.Errorf("=========contLink is %+v", contLink)
-		if err = netlink.LinkSetUp(contLink); err != nil {
-			klog.Errorf("========failed to setup contLink,err is %s", err)
-		}
-		err = netlink.AddrAdd(contLink, &netlink.Addr{IPNet: &podIp.IPNet})
-		if err != nil {
-			klog.Errorf("=======failed AddrAdd ,err is %v", err)
-			return err
-		}
-		ipaddrs, err := netlink.AddrList(contLink, netlink.FAMILY_ALL)
-		if err != nil {
-			klog.Errorf("========failed to get contLink ip,err is %v", err)
-		}
-		klog.Errorf("======contLink ip is %+v", ipaddrs)
-
-		defaultNet := net.IPNet{}
-		if podIp.IP.To4() != nil {
-			defaultNet.IP = net.IPv4zero
-		} else {
-			defaultNet.IP = net.IPv6zero
-		}
-		if podGw.IP == nil {
-			podGw.IP = net.IPv4(169, 254, 1, 1)
-		}
-		defaultRoute := &types.Route{Dst: defaultNet, GW: podGw.IP}
-		klog.Errorf("=====defaultRoute is %+v", defaultRoute)
-		klog.Errorf("=========contLink is %+v", contLink)
-
-		err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, contLink)
-		if err != nil {
-			klog.Errorf("=======failed AddRoute ,err is %v", err)
-			return err
-		}
-		if err := netlink.LinkSetMTU(contLink, mtu); err != nil {
-			klog.Errorf("=======failed LinkSetMTU ,err is %v", err)
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		klog.Errorf("=========failed netNs.Do ,err is %v", err)
-		return hostInterface, contInterface, err
-	}
-
-	// 配置默认的mac，mtu，路由
-	hostLink, err := netlink.LinkByName(hostVethName)
-	if err != nil {
-		klog.Errorf("=======failed LinkByName ,err is %v", err)
-		return hostInterface, contInterface, err
-	}
-	hardwareAddr, err := net.ParseMAC(constants.HostVethMac)
-	if err != nil {
-		klog.Errorf("=======failed ParseMAC ,err is %v", err)
-		return hostInterface, contInterface, err
-	}
-	if err := netlink.LinkSetHardwareAddr(hostLink, hardwareAddr); err != nil {
-		klog.Errorf("=======failed LinkSetHardwareAddr ,err is %v", err)
-		return hostInterface, contInterface, err
-	}
-	if err := netlink.LinkSetMTU(hostLink, mtu); err != nil {
-		klog.Errorf("=======failed LinkSetMTU ,err is %v", err)
-		return hostInterface, contInterface, err
-	}
-	hostInterface.Name = hostVethName
-	hostInterface.Mac = constants.HostVethMac
 	podIPNet := net.IPNet{}
 	hasIpv4 := false
 	hasIpv6 := false
@@ -586,15 +505,87 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp, podGw *ip.IP, mtu
 		podIPNet.Mask = net.CIDRMask(128, 128)
 		hasIpv6 = true
 	}
-	defaultRoute := &types.Route{Dst: podIPNet, GW: podGw.IP}
-	err = ip.AddRoute(&defaultRoute.Dst, defaultRoute.GW, hostLink)
+	// 创建vethPair，配置容器ip，默认路由，mtu
+	err := netNs.Do(func(hostNs ns.NetNS) error {
+		_, containerVeth, err := ip.SetupVethWithName(ifName, hostVethName, mtu, podMac, hostNs)
+		if err != nil {
+			klog.Errorf("failed setup veth ,err is %v", err)
+			return fmt.Errorf("failed to setUp veth pairs,err is %v", err)
+		}
+		contInterface.Name = containerVeth.Name
+		contInterface.Mac = containerVeth.HardwareAddr.String()
+		contInterface.Sandbox = netNs.Path()
+		contLink, err := netlink.LinkByName(containerVeth.Name)
+		if err != nil {
+			klog.Errorf("failed get contLink ,err is %v", err)
+			return err
+		}
+		klog.Errorf("=========contLink is %+v", contLink)
+		if err = netlink.LinkSetUp(contLink); err != nil {
+			klog.Errorf("failed to setup contLink,err is %s", err)
+			return err
+		}
+		err = netlink.AddrAdd(contLink, &netlink.Addr{IPNet: &podIPNet})
+		if err != nil {
+			klog.Errorf("failed AddrAdd ,err is %v", err)
+			return err
+		}
+
+		gw := net.IPv4(169, 254, 1, 1)
+		gwNet := &net.IPNet{IP: gw, Mask: net.CIDRMask(32, 32)}
+		if err = netlink.RouteAdd(
+			&netlink.Route{
+				LinkIndex: contLink.Attrs().Index,
+				Scope:     netlink.SCOPE_LINK,
+				Dst:       gwNet,
+			}); err != nil {
+			klog.Errorf("failed to add gw route: %v", err)
+			return fmt.Errorf("failed to add gw route: %v", err)
+		}
+		if err = ip.AddDefaultRoute(gw, contLink); err != nil {
+			klog.Errorf("failed to add default route: %v", err)
+			return fmt.Errorf("failed to add default route: %v", err)
+		}
+		if err = netlink.LinkSetMTU(contLink, mtu); err != nil {
+			klog.Errorf("failed LinkSetMTU ,err is %v", err)
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		klog.Errorf("=======failed AddRoute ,err is %v", err)
+		klog.Errorf("failed netNs.Do ,err is %v", err)
+		return hostInterface, contInterface, err
+	}
+
+	// 配置默认的mac，mtu，路由
+	hostLink, err := netlink.LinkByName(hostVethName)
+	if err != nil {
+		klog.Errorf("failed LinkByName ,err is %v", err)
+		return hostInterface, contInterface, err
+	}
+	hardwareAddr, err := net.ParseMAC(constants.HostVethMac)
+	if err != nil {
+		klog.Errorf("failed ParseMAC ,err is %v", err)
+		return hostInterface, contInterface, err
+	}
+	if err := netlink.LinkSetHardwareAddr(hostLink, hardwareAddr); err != nil {
+		klog.Errorf("failed LinkSetHardwareAddr ,err is %v", err)
+		return hostInterface, contInterface, err
+	}
+	if err := netlink.LinkSetMTU(hostLink, mtu); err != nil {
+		klog.Errorf("failed LinkSetMTU ,err is %v", err)
+		return hostInterface, contInterface, err
+	}
+	hostInterface.Name = hostVethName
+	hostInterface.Mac = constants.HostVethMac
+	err = ip.AddRoute(&podIPNet, nil, hostLink)
+	if err != nil {
+		klog.Errorf("failed AddRoute ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	err = configureSysctls(hostVethName, hasIpv4, hasIpv6)
 	if err != nil {
-		klog.Errorf("=======failed configureSysctls ,err is %v", err)
+		klog.Errorf("failed configureSysctls ,err is %v", err)
 		return hostInterface, contInterface, err
 	}
 	return hostInterface, contInterface, err

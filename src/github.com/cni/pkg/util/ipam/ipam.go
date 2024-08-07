@@ -140,29 +140,24 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	//// If no valid IP address found, return an error.
 	for i := 0; i < 10; i++ {
 		if err := ipam.Mu.Lock(); err == nil {
-			klog.Errorf("====get lock allocate")
+			klog.Errorf("get lock allocate")
 			break
 		} else {
-			klog.Errorf("==========get lock failed , err is %v", err)
+			klog.Errorf("get lock failed , err is %v", err)
 			time.Sleep(time.Millisecond)
 		}
 	}
 	defer ipam.Mu.Unlock()
-	klog.Errorf("=========start allocate ip ")
+	klog.Errorf("start allocate ip ")
 	var podIp ip.IP
 	var opts []clientv3.Op
 	if len(subnet.Reserved) <= 0 {
-		return nil, fmt.Errorf("========no address avaliable")
+		return nil, fmt.Errorf("no address avaliable")
 	}
-	klog.Errorf("=======subnet is %+v", subnet)
 	for ipaddr := range subnet.Reserved {
-		klog.Errorf("=====ipaddr is %+v", ipaddr)
 		delete(subnet.Reserved, ipaddr)
-		klog.Errorf("=====1111  ipaddr is %+v", ipaddr)
 		subnet.Allocated[ipaddr] = "1"
-		klog.Errorf("=====222222  ipaddr is %+v", ipaddr)
 		podIp.IP = net.ParseIP(ipaddr)
-		klog.Errorf("=====33333 podIp is %+v", podIp)
 		break
 	}
 	klog.Errorf("=====ip is %+v", podIp)
@@ -225,7 +220,7 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *i
 	}
 	var gw ip.IP
 	for _, subnet := range networkCrd.Subnets {
-		_, ipNet, err := net.ParseCIDR(subnet.CIDR)
+		_, _, err := net.ParseCIDR(subnet.CIDR)
 		if err != nil {
 			klog.Errorf("failed to parse subnet %v cidr of network %v", subnet, networkCrd.Name)
 			continue
@@ -236,9 +231,6 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *i
 			continue
 		}
 		podIp = ipAddr
-		podIp.Mask = ipNet.Mask
-		gw.IP = nil
-		gw.Mask = ipNet.Mask
 		podGw = &gw
 		break
 	}
