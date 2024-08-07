@@ -131,7 +131,6 @@ func (c *Client) GetPodAnnoAndLabels(ns, name string) (PodLabels, PodAnnotations
 
 func (c *Client) GetPodList() (PodList, error) {
 	var podList PodList
-
 	code, err := c.Request("GET", "/api/v1/pods", nil, &podList)
 	if err != nil {
 		klog.Errorf("failed to get k8s pods ,code %v, error is %v", code, err)

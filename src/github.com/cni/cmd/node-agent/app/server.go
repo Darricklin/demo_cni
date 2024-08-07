@@ -260,7 +260,7 @@ func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) 
 		} else {
 			return "", "", fmt.Errorf("wrong network")
 		}
-	} else if networkName, ok := labels[constants.NETWORK]; ok {
+	} else if networkName, ok = labels[constants.NETWORK]; ok {
 		if networkName != "" {
 			return networkName, podIP, nil
 		} else {
@@ -362,10 +362,12 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 
 	network, podIp, err := GetNetconf(na, namespace, name)
 	if err != nil {
+		klog.Errorf("failed to get network , err is %v", err)
 		return 0, err
 	}
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
 	if err != nil {
+		klog.Errorf("failed to NewIpamDriver , err is %v", err)
 		return 0, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
 	err = ipamDriver.ReleaseIpFromNetwork(network, podIp)

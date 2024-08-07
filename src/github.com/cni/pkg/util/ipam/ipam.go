@@ -170,7 +170,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		}
 	}
 
-	op, err := etcd.OpPutObject(networkCrd.Name, networkCrd)
+	op, err := etcd.OpPutNetwork(networkCrd.Name, networkCrdData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to Allocate ip due to OpPutObject failed ,err : %s ", err)
 	} else {
@@ -271,12 +271,14 @@ func (ipam *IpamDriver) ReleaseIpFromNetwork(network string, ip string) error {
 func ReleaseIp(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet, ipAddr string) error {
 	for i := 0; i < 10; i++ {
 		if err := ipam.Mu.Lock(); err == nil {
+			klog.Infof("get lock to ReleaseIp")
 			break
 		} else {
 			time.Sleep(time.Millisecond)
 		}
 	}
 	defer ipam.Mu.Unlock()
+	klog.Infof("ReleaseIp subnet is %+v,ip is %v", subnet, ipAddr)
 	var opts []clientv3.Op
 	delete(subnet.Allocated, ipAddr)
 	subnet.Reserved[ipAddr] = "1"
@@ -289,7 +291,7 @@ func ReleaseIp(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet,
 			networkCrdData.Subnets = append(networkCrdData.Subnets, subnetOld)
 		}
 	}
-	op, err := etcd.OpPutObject(networkCrd.Name, networkCrd)
+	op, err := etcd.OpPutNetwork(networkCrd.Name, networkCrdData)
 	if err != nil {
 		return fmt.Errorf("failed to Allocate ip due to OpPutObject failed ,err : %s ", err)
 	} else {
