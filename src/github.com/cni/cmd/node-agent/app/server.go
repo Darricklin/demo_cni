@@ -101,7 +101,7 @@ func initServer(na *options.NodeAgent) error {
 		Writes(PodResponse{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), PodResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
-	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
+	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
 		To(DeletePod(na)).
 		Doc("delete a Pod").
 		Param(ws.PathParameter(constants.PodNameSpace, "identifier of the pod namespace").DataType("string")).
