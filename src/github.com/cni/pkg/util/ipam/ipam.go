@@ -7,7 +7,6 @@ import (
 	"github.com/cni/cmd/node-agent/app/options"
 	"github.com/cni/pkg/util/etcd"
 	"github.com/cni/pkg/util/k8s"
-	"github.com/containernetworking/plugins/pkg/ip"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog"
 	"net"
@@ -121,7 +120,7 @@ func NewIpamDriver(na *options.NodeAgent, networkName string) (*IpamDriver, erro
 	return ipam, nil
 }
 
-func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet) (*ip.IP, error) {
+func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet) (*net.IPNet, error) {
 	//// Get the network address and mask length from the subnet.
 	//netAddr := subnet.IP.Mask(subnet.Mask)
 	//
@@ -148,8 +147,8 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		}
 	}
 	defer ipam.Mu.Unlock()
-	klog.Errorf("start allocate ip ")
-	var podIp ip.IP
+	klog.Info("start allocate ip ")
+	var podIp net.IPNet
 	var opts []clientv3.Op
 	if len(subnet.Reserved) <= 0 {
 		return nil, fmt.Errorf("no address avaliable")
@@ -160,7 +159,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		podIp.IP = net.ParseIP(ipaddr)
 		break
 	}
-	klog.Errorf("=====ip is %+v", podIp)
+	klog.Infof("ip is %+v", podIp)
 	networkCrdData := etcd.NetworkCrd{
 		Name:    networkCrd.Name,
 		Subnets: []etcd.Subnet{subnet},
@@ -182,7 +181,6 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 		// rollback
 		return nil, fmt.Errorf("failed to Allocate ip due to etcd commit failed ,err : %s ", err)
 	}
-	klog.Errorf("=========crd is %+v", networkCrdData)
 	return &podIp, nil
 }
 
@@ -206,7 +204,7 @@ func ones(ip net.IP) net.IP {
 	return result
 }
 
-func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *ip.IP, err error) {
+func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *net.IPNet, err error) {
 	networkCrd, err := ipam.EtcdClient.GetNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to get network %v from etcd ", network)
@@ -218,7 +216,6 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *i
 		errMsg := fmt.Sprintf("network %v don't have subnet ", network)
 		return nil, nil, errors.New(errMsg)
 	}
-	var gw ip.IP
 	for _, subnet := range networkCrd.Subnets {
 		_, _, err := net.ParseCIDR(subnet.CIDR)
 		if err != nil {
@@ -231,7 +228,6 @@ func (ipam *IpamDriver) AllocationIpFromNetwork(network string) (podIp, podGw *i
 			continue
 		}
 		podIp = ipAddr
-		podGw = &gw
 		break
 	}
 

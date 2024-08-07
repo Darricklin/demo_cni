@@ -101,7 +101,7 @@ func initServer(na *options.NodeAgent) error {
 		Writes(PodResponse{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), PodResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
-	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
+	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
 		To(DeletePod(na)).
 		Doc("delete a Pod").
 		Param(ws.PathParameter(constants.PodNameSpace, "identifier of the pod namespace").DataType("string")).
@@ -168,7 +168,6 @@ type Pod struct {
 }
 
 type PodResponse struct {
-	Port   Port            `json:"port"`
 	Result types100.Result `json:"result"`
 }
 type Port struct {
@@ -297,10 +296,15 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	if err != nil {
 		return 0, podResp, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
-	podIp, gwIp, err := ipamDriver.AllocationIpFromNetwork(network)
+	podIp, _, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to allocation ip ,err is %v", err)
 		return 0, PodResponse{}, err
+	}
+	if podIp.IP.To4() != nil {
+		podIp.Mask = net.CIDRMask(32, 32)
+	} else {
+		podIp.Mask = net.CIDRMask(128, 128)
 	}
 	klog.Errorf("==========podIP is %+v", podIp)
 	ifmac := GeneratePortRandomMacAddress()
@@ -326,8 +330,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
 	podIpConfig := &types100.IPConfig{
 		Interface: types100.Int(1),
-		Address:   podIp.IPNet,
-		Gateway:   gwIp.IP,
+		Address:   *podIp,
 	}
 	result.IPs = []*types100.IPConfig{podIpConfig}
 	podResp.Result = result
@@ -489,7 +492,7 @@ func configureSysctls(hostVethName string, hasIPv4, hasIPv6 bool) error {
 	return nil
 }
 
-func SetupVethPair(ifName, podMac, hostVethName string, podIp *ip.IP, mtu int, netNs ns.NetNS) (*types100.Interface,
+func SetupVethPair(ifName, podMac, hostVethName string, podIp *net.IPNet, mtu int, netNs ns.NetNS) (*types100.Interface,
 	*types100.Interface, error) {
 	hostInterface := &types100.Interface{}
 	contInterface := &types100.Interface{}
