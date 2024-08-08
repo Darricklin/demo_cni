@@ -63,9 +63,7 @@ type NodeCondition struct {
 }
 
 type PodList struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-	Items      []Pod  `json:"items"`
+	Items []Pod `json:"items"`
 }
 
 type Pod struct {
@@ -83,18 +81,28 @@ type ObjectWithMeta struct {
 }
 
 type PodSpec struct {
-	HostNetwork bool   `json:"hostNetwork"`
-	NodeName    string `json:"nodeName"`
+	HostNetwork bool           `json:"hostNetwork"`
+	Containers  []PodContainer `json:"containers"`
 }
 
+type PodContainer struct {
+	Ports []PodContainerPort `json:"ports"`
+}
+
+type PodContainerPort struct {
+	PodIPv4       string
+	PodIpv6       string
+	Name          string `json:"name"`
+	HostPort      int    `json:"hostPort"`
+	ContainerPort int    `json:"containerPort"`
+	Protocol      string `json:"protocol"`
+}
 type PodMeta struct {
-	Name              string         `json:"name,omitempty"`
-	NameSpace         string         `json:"namespace,omitempty"`
-	UID               string         `json:"uid,omitempty"`
-	ResourceVersion   string         `json:"resourceVersion,omitempty"`
-	CreationTimestamp string         `json:"creationTimestamp,omitempty"`
-	Annotations       PodAnnotations `json:"annotations,omitempty"`
-	Labels            PodLabels      `json:"labels,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	NameSpace   string         `json:"namespace,omitempty"`
+	NodeName    string         `json:"nodeName"`
+	Annotations PodAnnotations `json:"annotations,omitempty"`
+	Labels      PodLabels      `json:"labels,omitempty"`
 }
 
 type PodAnnotations map[string]string
@@ -113,9 +121,12 @@ type NetworkInfo struct {
 	QosId  string   `json:"qos_id"`
 }
 type PodStatus struct {
-	PodIP  string `json:"podIP"`
-	Phase  string `json:"phase"`
-	HostIP string `json:"hostIp"`
+	PodIP  string  `json:"podIP"`
+	PodIps []PodIp `json:"podIPs"`
+	HostIP string  `json:"hostIp"`
+}
+type PodIp struct {
+	IP string `json:"ip,omitempty"`
 }
 
 type EndpointsList struct {

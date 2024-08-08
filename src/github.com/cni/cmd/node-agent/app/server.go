@@ -257,14 +257,10 @@ func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) 
 	if networkName, ok := annos[constants.NETWORK]; ok {
 		if networkName != "" {
 			return networkName, podIP, nil
-		} else {
-			return "", "", fmt.Errorf("wrong network")
 		}
 	} else if networkName, ok = labels[constants.NETWORK]; ok {
 		if networkName != "" {
 			return networkName, podIP, nil
-		} else {
-			return "", "", fmt.Errorf("wrong network")
 		}
 	}
 	return "", "", fmt.Errorf("no network find")
@@ -359,27 +355,30 @@ func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response 
 func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns string) (int, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
-
+	klog.Errorf("====deletePodWithLock, pod namespace %v, pod name %v, pod ifname %v, netns is %v", namespace, name, ifname, netns)
 	network, podIp, err := GetNetconf(na, namespace, name)
 	if err != nil {
 		klog.Errorf("failed to get network , err is %v", err)
 		return 0, err
 	}
+	klog.Errorf("=====deletePodWithLock, network is %v, podIp is %v", network, podIp)
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
 	if err != nil {
 		klog.Errorf("failed to NewIpamDriver , err is %v", err)
 		return 0, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
+	klog.Error("=====deletePodWithLock, ipamDriver ok")
 	err = ipamDriver.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
 		return 0, err
 	}
+	klog.Errorf("=====deletePodWithLock, ReleaseIpFromNetwork ok")
 	podNs, err := ns.GetNS(netns)
 	if err != nil {
 		klog.Errorf("failed to get ns [%s] of pod %s %s", netns, namespace, name)
 		return 0, err
 	}
-
+	klog.Errorf("=====deletePodWithLock, getNs ,ns is %+v", podNs)
 	startTime := time.Now()
 	done := make(chan struct{})
 	var nsErr, linkErr error

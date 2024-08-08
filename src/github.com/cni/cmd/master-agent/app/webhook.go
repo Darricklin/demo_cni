@@ -185,6 +185,14 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 					}
 				}
 			}
+			if networkAnno, ok := pod.MetaData.Labels[constants.NETWORK]; ok {
+				networkInfo := strings.Split(networkAnno, "/")
+				if len(networkInfo) == 2 {
+					if request.Name == networkInfo[1] {
+						return fmt.Errorf("network used by pod,cannot delete")
+					}
+				}
+			}
 		}
 		if !reflect.DeepEqual(network.Spec.SubNets, networkOld.Spec.SubNets) {
 			var ops []clientv3.Op
@@ -233,6 +241,19 @@ func validateNetwork(nm *options.MasterAgent, request *v1beta1.AdmissionRequest)
 		}
 		for _, pod := range allPodList.Items {
 			if networkAnno, ok := pod.MetaData.Annotations[constants.NETWORK]; ok {
+				klog.Errorf("=======networkAnno is %+v", networkAnno)
+				networkInfo := strings.Split(networkAnno, "/")
+				klog.Errorf("=======networkInfo is %+v", networkInfo)
+				klog.Errorf("=======request is %+v", request)
+				if len(networkInfo) == 2 {
+					klog.Errorf("=======networkInfo[1] is %+v,equal is %v", networkInfo[1], request.Name == networkInfo[1])
+					if request.Name == networkInfo[1] {
+						klog.Errorf("=======networkInfo is %+v\n", networkInfo)
+						return fmt.Errorf("network used by pod,cannot delete")
+					}
+				}
+			}
+			if networkAnno, ok := pod.MetaData.Labels[constants.NETWORK]; ok {
 				klog.Errorf("=======networkAnno is %+v", networkAnno)
 				networkInfo := strings.Split(networkAnno, "/")
 				klog.Errorf("=======networkInfo is %+v", networkInfo)

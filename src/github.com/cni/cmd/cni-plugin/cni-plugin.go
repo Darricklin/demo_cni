@@ -164,7 +164,7 @@ func cmdDel(args *skel.CmdArgs) error {
 func deletePod(namespace, name, ifname, netns string) error {
 	client := rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix")
 	url := fmt.Sprintf("%s%s/%s/%s/%s/%s", constants.Base, constants.Ports, namespace, name, ifname, netns)
-	logInfof("send pod deletion request: pod namespace, pod name, pod ifname", namespace, name, ifname)
+	logInfof("send pod deletion request: pod namespace %v, pod name %v, pod ifname %v, netns is %v, url is %v", namespace, name, ifname, netns, url)
 	code, err := client.Request("DELETE", url, nil, nil)
 	if err != nil {
 		return err

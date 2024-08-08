@@ -136,16 +136,6 @@ func (c *Client) GetPodList() (PodList, error) {
 		klog.Errorf("failed to get k8s pods ,code %v, error is %v", code, err)
 		return podList, err
 	}
-	podListResp := PodList{
-		Kind:       podList.Kind,
-		APIVersion: podList.APIVersion,
-		Items:      []Pod{},
-	}
-	for _, pod := range podList.Items {
-		if pod.Status.Phase == "Running" {
-			podListResp.Items = append(podListResp.Items, pod)
-		}
-	}
 	klog.Infof("get k8s pods : %+v , code : %v", podList, code)
 	return podList, nil
 }
