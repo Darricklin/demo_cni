@@ -353,8 +353,8 @@ func deletePodWithLock(na *options.NodeAgent, pod Pod) (int, error) {
 
 	network, podIp, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
-		klog.Errorf("failed to get network , err is %v", err)
-		return http.StatusInternalServerError, err
+		klog.Infof("no network , err is %v", err)
+		return http.StatusNoContent, err
 	}
 	klog.Errorf("=====deletePodWithLock, network is %v, podIp is %v", network, podIp)
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
