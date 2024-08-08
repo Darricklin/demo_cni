@@ -328,15 +328,7 @@ func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response 
 		rest.WriteError(response, http.StatusInternalServerError, err.Error())
 		return
 	}
-	//namespace := request.PathParameter(constants.PodNameSpace)
-	//name := request.PathParameter(constants.PodName)
-	//ifname := request.PathParameter(constants.IFName)
-	//netns := request.PathParameter(constants.Netns)
-	//code, err := deletePodFunc(na, namespace, name, ifname, netns)
-	//if err != nil {
-	//	klog.Error(err)
-	//}
-	klog.Infof("create pod request received: body is %+v", pod)
+	klog.Infof("delete pod request received: body is %+v", pod)
 	code, err := deletePodFunc(na, pod)
 	if err != nil {
 		klog.Error(err, code)
@@ -353,8 +345,8 @@ func deletePodWithLock(na *options.NodeAgent, pod Pod) (int, error) {
 
 	network, podIp, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
-		klog.Infof("no network , err is %v", err)
-		return http.StatusNoContent, err
+		klog.Infof("no network find, due to %v", err)
+		return http.StatusNoContent, nil
 	}
 	klog.Errorf("=====deletePodWithLock, network is %v, podIp is %v", network, podIp)
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
@@ -371,7 +363,7 @@ func deletePodWithLock(na *options.NodeAgent, pod Pod) (int, error) {
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
 		klog.Infof("pod ns has cleand , pod %s %s", pod.Namespace, pod.Name)
-		return http.StatusNoContent, err
+		return http.StatusNoContent, nil
 	}
 	klog.Errorf("=====deletePodWithLock, getNs ,ns is %+v", podNs)
 	startTime := time.Now()
