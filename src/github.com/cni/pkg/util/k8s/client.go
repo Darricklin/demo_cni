@@ -277,8 +277,7 @@ func (c *Client) GetNetworkCrd(name string) (NetworkCrd, error) {
 	url := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/network-attachment-definitions/%s", name)
 	code, err := c.Request("GET", url, nil, &networkCrd)
 	if err != nil {
-		klog.Errorf("failed to get k8s networkCrd ,code %v, error is %v", code, err)
-		return networkCrd, err
+		return networkCrd, fmt.Errorf("failed to get k8s networkCrd ,code %v, error is %v", code, err)
 	}
 	klog.Infof("get k8s networkCrd : %+v , code : %v", networkCrd, code)
 	return networkCrd, nil

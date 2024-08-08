@@ -139,7 +139,7 @@ func AllocateIP(ipam *IpamDriver, networkCrd etcd.NetworkCrd, subnet etcd.Subnet
 	//// If no valid IP address found, return an error.
 	for i := 0; i < 10; i++ {
 		if err := ipam.Mu.Lock(); err == nil {
-			klog.Errorf("get lock allocate")
+			klog.Info("get lock allocate ip")
 			break
 		} else {
 			klog.Errorf("get lock failed , err is %v", err)
