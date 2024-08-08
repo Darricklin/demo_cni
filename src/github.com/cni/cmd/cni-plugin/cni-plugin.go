@@ -154,7 +154,9 @@ func cmdDel(args *skel.CmdArgs) error {
 	if podNameSpace == "" || podName == "" || podIfName == "" {
 		return logErrorf("required CNI variable missing")
 	}
-	logInfof("receive pod deletion event : namespace %s, pod %s, ifname %s", podNameSpace, podName, podIfName)
+
+	logInfof("receive pod deletion event : namespace %v, pod %v, ifname %v, netns %v", podNameSpace, podName, podIfName, args.Netns)
+	logInfof("receive pod deletion event: args is %+v", args)
 	if err = deletePod(podNameSpace, podName, podIfName, args.Netns); err != nil {
 		return logErrorf("failed to delete pod : %v", err)
 	}

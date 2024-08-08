@@ -99,7 +99,7 @@ func initServer(na *options.NodeAgent) error {
 		Doc("create a pod").
 		Reads(Pod{}).
 		Writes(PodResponse{}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), PodResponse{}).
+		Returns(http.StatusCreated, http.StatusText(http.StatusCreated), PodResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
 	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
 		To(DeletePod(na)).
@@ -108,7 +108,8 @@ func initServer(na *options.NodeAgent) error {
 		Param(ws.PathParameter(constants.PodName, "identifier of the pod name").DataType("string")).
 		Param(ws.PathParameter(constants.IFName, "identifier of the ifname").DataType("string")).
 		Param(ws.PathParameter(constants.Netns, "identifier of the netns").DataType("string")).
-		Returns(http.StatusNoContent, http.StatusText(http.StatusNoContent), nil))
+		Returns(http.StatusNoContent, http.StatusText(http.StatusNoContent), nil).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), nil))
 	ws.Route(ws.GET(constants.Health).To(GetHealth(na)).
 		Doc("get server health").
 		Writes(HealthResp{}).
@@ -282,7 +283,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	klog.Errorf("==========create pod %+v", pod)
 	network, _, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
-		return 400, podResp, err
+		return http.StatusInternalServerError, podResp, err
 	}
 	klog.Errorf("==========network is %+v", network)
 	result := types100.Result{
@@ -290,12 +291,12 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	}
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
 	if err != nil {
-		return 0, podResp, fmt.Errorf("failed to get ipamDriver of network %s", network)
+		return http.StatusInternalServerError, podResp, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
 	podIp, _, err := ipamDriver.AllocationIpFromNetwork(network)
 	if err != nil {
 		klog.Errorf("failed to allocation ip ,err is %v", err)
-		return 0, PodResponse{}, err
+		return http.StatusInternalServerError, PodResponse{}, err
 	}
 	if podIp.IP.To4() != nil {
 		podIp.Mask = net.CIDRMask(32, 32)
@@ -310,7 +311,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		if releaseIpErr := ipamDriver.ReleaseIpFromNetwork(network, podIp.String()); releaseIpErr != nil {
 			klog.Errorf("failed to releaseIp when CreatePod failed rollback ,err is %s", releaseIpErr)
 		}
-		return 0, PodResponse{}, err
+		return http.StatusInternalServerError, PodResponse{}, err
 	}
 	klog.Errorf("==========podNs is %+v", podNs)
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
@@ -320,7 +321,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		if releaseIpErr := ipamDriver.ReleaseIpFromNetwork(network, podIp.String()); releaseIpErr != nil {
 			klog.Errorf("failed to releaseIp when CreatePod failed rollback ,err is %s", releaseIpErr)
 		}
-		return 0, PodResponse{}, err
+		return http.StatusInternalServerError, PodResponse{}, err
 	}
 	klog.Errorf("==========pod hostInterface is %+v ,", hostInterface)
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
@@ -330,7 +331,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	}
 	result.IPs = []*types100.IPConfig{podIpConfig}
 	podResp.Result = result
-	return 200, podResp, nil
+	return http.StatusCreated, podResp, nil
 }
 
 func DeletePod(na *options.NodeAgent) func(request *restful.Request, response *restful.Response) {
@@ -359,24 +360,24 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 	network, podIp, err := GetNetconf(na, namespace, name)
 	if err != nil {
 		klog.Errorf("failed to get network , err is %v", err)
-		return 0, err
+		return http.StatusInternalServerError, err
 	}
 	klog.Errorf("=====deletePodWithLock, network is %v, podIp is %v", network, podIp)
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
 	if err != nil {
 		klog.Errorf("failed to NewIpamDriver , err is %v", err)
-		return 0, fmt.Errorf("failed to get ipamDriver of network %s", network)
+		return http.StatusInternalServerError, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
 	klog.Error("=====deletePodWithLock, ipamDriver ok")
 	err = ipamDriver.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
-		return 0, err
+		return http.StatusInternalServerError, err
 	}
 	klog.Errorf("=====deletePodWithLock, ReleaseIpFromNetwork ok")
 	podNs, err := ns.GetNS(netns)
 	if err != nil {
-		klog.Errorf("failed to get ns [%s] of pod %s %s", netns, namespace, name)
-		return 0, err
+		klog.Infof("pod ns has cleand , pod %s %s", namespace, name)
+		return http.StatusNoContent, err
 	}
 	klog.Errorf("=====deletePodWithLock, getNs ,ns is %+v", podNs)
 	startTime := time.Now()
@@ -398,22 +399,22 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 		if nsErr != nil {
 			if _, ok := nsErr.(ns.NSPathNotExistErr); ok {
 				klog.Infof("netns already gone ,nothing to do")
-				return 204, nil
+				return http.StatusNoContent, nil
 			}
-			return 0, fmt.Errorf("failed to enter netns %v", nsErr)
+			return http.StatusInternalServerError, fmt.Errorf("failed to enter netns %v", nsErr)
 		}
 		if linkErr != nil {
 			if _, ok := linkErr.(netlink.LinkNotFoundError); ok {
 				klog.Infof("veth already gone,nothing to do ")
-				return 204, nil
+				return http.StatusNoContent, nil
 			}
-			return 0, fmt.Errorf("failed to clean up veth inside netns : %v", linkErr)
+			return http.StatusInternalServerError, fmt.Errorf("failed to clean up veth inside netns : %v", linkErr)
 		}
 		klog.Infof("after %v,delete device in netns ", time.Since(startTime))
 	case <-time.After(20 * time.Second):
-		return 0, fmt.Errorf("timeout deleting device in netns %s", namespace)
+		return http.StatusInternalServerError, fmt.Errorf("timeout deleting device in netns %s", namespace)
 	}
-	return 204, nil
+	return http.StatusNoContent, nil
 }
 
 func writeProcSys(path, value string) error {
