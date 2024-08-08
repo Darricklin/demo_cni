@@ -101,15 +101,21 @@ func initServer(na *options.NodeAgent) error {
 		Writes(PodResponse{}).
 		Returns(http.StatusCreated, http.StatusText(http.StatusCreated), PodResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
-	ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
+	ws.Route(ws.DELETE(constants.Ports).
 		To(DeletePod(na)).
-		Doc("delete a Pod").
-		Param(ws.PathParameter(constants.PodNameSpace, "identifier of the pod namespace").DataType("string")).
-		Param(ws.PathParameter(constants.PodName, "identifier of the pod name").DataType("string")).
-		Param(ws.PathParameter(constants.IFName, "identifier of the ifname").DataType("string")).
-		Param(ws.PathParameter(constants.Netns, "identifier of the netns").DataType("string")).
-		Returns(http.StatusNoContent, http.StatusText(http.StatusNoContent), nil).
-		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), nil))
+		Doc("delete a pod").
+		Reads(Pod{}).
+		Returns(http.StatusCreated, http.StatusText(http.StatusCreated), PodResponse{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), PodResponse{}))
+	//ws.Route(ws.DELETE(fmt.Sprintf("%s/{%s}/{%s}/{%s}/{%s}", constants.Ports, constants.PodNameSpace, constants.PodName, constants.IFName, constants.Netns)).
+	//	To(DeletePod(na)).
+	//	Doc("delete a Pod").
+	//	Param(ws.PathParameter(constants.PodNameSpace, "identifier of the pod namespace").DataType("string")).
+	//	Param(ws.PathParameter(constants.PodName, "identifier of the pod name").DataType("string")).
+	//	Param(ws.PathParameter(constants.IFName, "identifier of the ifname").DataType("string")).
+	//	Param(ws.PathParameter(constants.Netns, "identifier of the netns").DataType("string")).
+	//	Returns(http.StatusNoContent, http.StatusText(http.StatusNoContent), nil).
+	//	Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), nil))
 	ws.Route(ws.GET(constants.Health).To(GetHealth(na)).
 		Doc("get server health").
 		Writes(HealthResp{}).
@@ -250,32 +256,6 @@ func ProcessCreatePod(na *options.NodeAgent, request *restful.Request, response 
 	}
 }
 
-func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) {
-	labels, annos, podIP, err := na.K8sAgent.GetPodAnnoAndLabels(ns, name)
-	if err != nil {
-		return "", "", err
-	}
-	if networkName, ok := annos[constants.NETWORK]; ok {
-		if networkName != "" {
-			return networkName, podIP, nil
-		}
-	} else if networkName, ok = labels[constants.NETWORK]; ok {
-		if networkName != "" {
-			return networkName, podIP, nil
-		}
-	}
-	return "", "", fmt.Errorf("no network find")
-}
-
-func GeneratePortRandomMacAddress() string {
-	buf := make([]byte, 6)
-	if _, err := rand.Read(buf); err != nil {
-		return ""
-	}
-	macAddr := fmt.Sprintf("de:%02x:%02x:%02x:%02x:%02x", buf[1], buf[2], buf[3], buf[4], buf[5])
-	return macAddr
-}
-
 func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
@@ -341,23 +321,37 @@ func DeletePod(na *options.NodeAgent) func(request *restful.Request, response *r
 }
 
 func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response *restful.Response,
-	deletePodFunc func(*options.NodeAgent, string, string, string, string) (int, error)) {
-	namespace := request.PathParameter(constants.PodNameSpace)
-	name := request.PathParameter(constants.PodName)
-	ifname := request.PathParameter(constants.IFName)
-	netns := request.PathParameter(constants.Netns)
-	code, err := deletePodFunc(na, namespace, name, ifname, netns)
-	if err != nil {
+	deletePodFunc func(*options.NodeAgent, Pod) (int, error)) {
+	var pod Pod
+	if err := request.ReadEntity(&pod); err != nil {
 		klog.Error(err)
+		rest.WriteError(response, http.StatusInternalServerError, err.Error())
+		return
+	}
+	//namespace := request.PathParameter(constants.PodNameSpace)
+	//name := request.PathParameter(constants.PodName)
+	//ifname := request.PathParameter(constants.IFName)
+	//netns := request.PathParameter(constants.Netns)
+	//code, err := deletePodFunc(na, namespace, name, ifname, netns)
+	//if err != nil {
+	//	klog.Error(err)
+	//}
+	klog.Infof("create pod request received: body is %+v", pod)
+	code, err := deletePodFunc(na, pod)
+	if err != nil {
+		klog.Error(err, code)
+		rest.WriteError(response, http.StatusInternalServerError, err.Error())
+		return
 	}
 	response.WriteHeader(code)
 }
 
-func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns string) (int, error) {
+func deletePodWithLock(na *options.NodeAgent, pod Pod) (int, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
-	klog.Errorf("====deletePodWithLock, pod namespace %v, pod name %v, pod ifname %v, netns is %v", namespace, name, ifname, netns)
-	network, podIp, err := GetNetconf(na, namespace, name)
+	klog.Errorf("====deletePodWithLock, pod %+v", pod)
+
+	network, podIp, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
 		klog.Errorf("failed to get network , err is %v", err)
 		return http.StatusInternalServerError, err
@@ -374,9 +368,9 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 		return http.StatusInternalServerError, err
 	}
 	klog.Errorf("=====deletePodWithLock, ReleaseIpFromNetwork ok")
-	podNs, err := ns.GetNS(netns)
+	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
-		klog.Infof("pod ns has cleand , pod %s %s", namespace, name)
+		klog.Infof("pod ns has cleand , pod %s %s", pod.Namespace, pod.Name)
 		return http.StatusNoContent, err
 	}
 	klog.Errorf("=====deletePodWithLock, getNs ,ns is %+v", podNs)
@@ -387,7 +381,7 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 		defer close(done)
 		nsErr = podNs.Do(func(netNS ns.NetNS) error {
 			var iface netlink.Link
-			iface, linkErr = netlink.LinkByName(ifname)
+			iface, linkErr = netlink.LinkByName(pod.IfName)
 			if linkErr != nil {
 				linkErr = netlink.LinkDel(iface)
 			}
@@ -412,7 +406,7 @@ func deletePodWithLock(na *options.NodeAgent, namespace, name, ifname, netns str
 		}
 		klog.Infof("after %v,delete device in netns ", time.Since(startTime))
 	case <-time.After(20 * time.Second):
-		return http.StatusInternalServerError, fmt.Errorf("timeout deleting device in netns %s", namespace)
+		return http.StatusInternalServerError, fmt.Errorf("timeout deleting device in netns %s", pod.NetNs)
 	}
 	return http.StatusNoContent, nil
 }
@@ -601,4 +595,30 @@ func Min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func GetNetconf(na *options.NodeAgent, ns, name string) (string, string, error) {
+	labels, annos, podIP, err := na.K8sAgent.GetPodAnnoAndLabels(ns, name)
+	if err != nil {
+		return "", "", err
+	}
+	if networkName, ok := annos[constants.NETWORK]; ok {
+		if networkName != "" {
+			return networkName, podIP, nil
+		}
+	} else if networkName, ok = labels[constants.NETWORK]; ok {
+		if networkName != "" {
+			return networkName, podIP, nil
+		}
+	}
+	return "", "", fmt.Errorf("no network find")
+}
+
+func GeneratePortRandomMacAddress() string {
+	buf := make([]byte, 6)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	macAddr := fmt.Sprintf("de:%02x:%02x:%02x:%02x:%02x", buf[1], buf[2], buf[3], buf[4], buf[5])
+	return macAddr
 }

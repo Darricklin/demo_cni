@@ -154,25 +154,31 @@ func cmdDel(args *skel.CmdArgs) error {
 	if podNameSpace == "" || podName == "" || podIfName == "" {
 		return logErrorf("required CNI variable missing")
 	}
-
-	logInfof("receive pod deletion event : namespace %v, pod %v, ifname %v, netns %v", podNameSpace, podName, podIfName, args.Netns)
-	logInfof("receive pod deletion event: args is %+v", args)
-	if err = deletePod(podNameSpace, podName, podIfName, args.Netns); err != nil {
+	pod := app.Pod{
+		Name:        podName,
+		Namespace:   podNameSpace,
+		ContainerId: args.ContainerID,
+		NetNs:       args.Netns,
+		IfName:      args.IfName,
+		MTU:         n.MTU,
+	}
+	logInfof("receive pod deletion event : pod is %+v", pod)
+	if err = deletePod(pod); err != nil {
 		return logErrorf("failed to delete pod : %v", err)
 	}
 	return nil
 }
 
-func deletePod(namespace, name, ifname, netns string) error {
+func deletePod(pod app.Pod) error {
 	client := rest.NewClient(rest.NewHttpClientUnix(constants.NodeAgentSock), "http://unix")
-	url := fmt.Sprintf("%s%s/%s/%s/%s/%s", constants.Base, constants.Ports, namespace, name, ifname, netns)
-	logInfof("send pod deletion request: pod namespace %v, pod name %v, pod ifname %v, netns is %v, url is %v", namespace, name, ifname, netns, url)
-	code, err := client.Request("DELETE", url, nil, nil)
+	url := fmt.Sprintf("%s%s", constants.Base, constants.Ports)
+	logInfof("send pod deletion request: pod  %+v, url is %v", pod, url)
+	code, err := client.Request("DELETE", url, pod, nil)
 	if err != nil {
 		return err
 	}
-	logInfof("send pod deletion succeed: pod namespace, pod name, code ", namespace, name, code)
-	return err
+	logInfof("send pod deletion succeed: pod %+v, code %v ", pod, code)
+	return nil
 }
 
 func main() {
