@@ -7,7 +7,6 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	"io"
 	"io/ioutil"
-	"k8s.io/klog"
 	"net/http"
 	"strings"
 )
@@ -30,9 +29,7 @@ type BaseClient interface {
 
 func Request(c BaseClient, method string, path string, body interface{}, respObj interface{}) (code int, err error) {
 	code = http.StatusInternalServerError
-	klog.Infof("body is %+v", body)
 	req, err := c.PrepareRequest(method, path, body)
-	klog.Infof("req is %+v", req)
 	if err != nil {
 		return
 	}
@@ -40,7 +37,6 @@ func Request(c BaseClient, method string, path string, body interface{}, respObj
 	if err != nil {
 		return
 	}
-	klog.Infof("resp is %+v", resp)
 	resp, err = c.CheckResponse(method, path, body, resp)
 	if err != nil {
 		if resp != nil {
@@ -75,9 +71,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 func (c *Client) PrepareRequest(method string, path string, body interface{}) (*http.Request, error) {
-	klog.Infof("method is %v,path is %v, body is %+v, body is nil : %v", method, path, body, body == nil)
 	absPath := URLJoin(c.BaseURL, path)
-	klog.Infof("absPath is %v", absPath)
 	var reqBody io.Reader
 	if body == nil {
 		reqBody = nil
@@ -86,9 +80,7 @@ func (c *Client) PrepareRequest(method string, path string, body interface{}) (*
 		if err != nil {
 			return nil, NewJsonEncodingError(body, err)
 		}
-		klog.Infof("jsonStr body : %s", jsonStr)
 		reqBody = bytes.NewReader(jsonStr)
-		klog.Infof("reqBody body : %s", reqBody)
 	}
 	req, err := http.NewRequest(method, absPath, reqBody)
 	if err != nil {

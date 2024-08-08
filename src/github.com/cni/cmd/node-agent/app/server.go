@@ -244,7 +244,6 @@ func ProcessCreatePod(na *options.NodeAgent, request *restful.Request, response 
 		rest.WriteError(response, http.StatusInternalServerError, err.Error())
 		return
 	}
-	klog.Infof("create pod request received: body is %+v", pod)
 	code, resp, err := createPodFunc(na, pod)
 	if err != nil {
 		klog.Error(err, code)
@@ -260,12 +259,12 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
 	var podResp PodResponse
-	klog.Errorf("==========create pod %+v", pod)
+	klog.Infof("create pod %+v", pod)
 	network, _, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
 		return http.StatusInternalServerError, podResp, err
 	}
-	klog.Errorf("==========network is %+v", network)
+	klog.Infof("network is %+v", network)
 	result := types100.Result{
 		CNIVersion: pod.Result.CNIVersion,
 	}
@@ -283,7 +282,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 	} else {
 		podIp.Mask = net.CIDRMask(128, 128)
 	}
-	klog.Errorf("==========podIP is %+v", podIp)
+	klog.Infof("podIP is %+v", podIp)
 	ifmac := GeneratePortRandomMacAddress()
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
@@ -293,7 +292,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		}
 		return http.StatusInternalServerError, PodResponse{}, err
 	}
-	klog.Errorf("==========podNs is %+v", podNs)
+	klog.Infof("podNs is %+v", podNs)
 	hostVethName := constants.HostVethPre + pod.ContainerId[:Min(11, len(pod.ContainerId))]
 	hostInterface, contInterface, err := SetupVethPair(pod.IfName, ifmac, hostVethName, podIp, 1500, podNs)
 	if err != nil {
@@ -303,7 +302,7 @@ func createPodWithLock(na *options.NodeAgent, pod Pod) (int, PodResponse, error)
 		}
 		return http.StatusInternalServerError, PodResponse{}, err
 	}
-	klog.Errorf("==========pod hostInterface is %+v ,", hostInterface)
+	klog.Infof("pod hostInterface is %+v ,", hostInterface)
 	result.Interfaces = []*types100.Interface{hostInterface, contInterface}
 	podIpConfig := &types100.IPConfig{
 		Interface: types100.Int(1),
@@ -341,31 +340,30 @@ func ProcessDeletePod(na *options.NodeAgent, request *restful.Request, response 
 func deletePodWithLock(na *options.NodeAgent, pod Pod) (int, error) {
 	na.Locker.Lock()
 	defer na.Locker.Unlock()
-	klog.Errorf("====deletePodWithLock, pod %+v", pod)
+	klog.Infof("deletePodWithLock, pod %+v", pod)
 
 	network, podIp, err := GetNetconf(na, pod.Namespace, pod.Name)
 	if err != nil {
 		klog.Infof("no network find, due to %v", err)
 		return http.StatusNoContent, nil
 	}
-	klog.Errorf("=====deletePodWithLock, network is %v, podIp is %v", network, podIp)
+	klog.Infof("deletePod, network is %v, podIp is %v", network, podIp)
 	ipamDriver, err := ipam.NewIpamDriver(na, network)
 	if err != nil {
 		klog.Errorf("failed to NewIpamDriver , err is %v", err)
 		return http.StatusInternalServerError, fmt.Errorf("failed to get ipamDriver of network %s", network)
 	}
-	klog.Error("=====deletePodWithLock, ipamDriver ok")
 	err = ipamDriver.ReleaseIpFromNetwork(network, podIp)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	klog.Errorf("=====deletePodWithLock, ReleaseIpFromNetwork ok")
+	klog.Info("deletePod, ReleaseIpFromNetwork ok")
 	podNs, err := ns.GetNS(pod.NetNs)
 	if err != nil {
 		klog.Infof("pod ns has cleand , pod %s %s", pod.Namespace, pod.Name)
 		return http.StatusNoContent, nil
 	}
-	klog.Errorf("=====deletePodWithLock, getNs ,ns is %+v", podNs)
+	klog.Infof("deletePodWithLock, getNs ,ns is %+v", podNs)
 	startTime := time.Now()
 	done := make(chan struct{})
 	var nsErr, linkErr error
@@ -511,7 +509,7 @@ func SetupVethPair(ifName, podMac, hostVethName string, podIp *net.IPNet, mtu in
 			klog.Errorf("failed get contLink ,err is %v", err)
 			return err
 		}
-		klog.Errorf("=========contLink is %+v", contLink)
+		klog.Infof("contLink is %+v", contLink)
 		if err = netlink.LinkSetUp(contLink); err != nil {
 			klog.Errorf("failed to setup contLink,err is %s", err)
 			return err
