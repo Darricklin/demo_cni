@@ -10,6 +10,7 @@ import (
 	"github.com/cni/pkg/util/logs"
 	"github.com/cni/pkg/util/server"
 	"math/rand"
+	_ "net/http/pprof"
 	"os"
 	"time"
 )
