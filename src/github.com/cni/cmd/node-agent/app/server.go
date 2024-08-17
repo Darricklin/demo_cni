@@ -21,7 +21,6 @@ import (
 	"k8s.io/klog"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"time"
 )
